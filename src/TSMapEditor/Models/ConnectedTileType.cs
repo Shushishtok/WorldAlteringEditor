@@ -200,6 +200,9 @@ namespace TSMapEditor.Models
             List <ConnectedTileAStarNode > nextNodes = new List<ConnectedTileAStarNode>();
             foreach (var tile in tiles)
             {
+                if (!tile.IsLinear)
+                    continue;
+
                 if (!allowTurn && tile.ConnectionPoints[0].Side != tile.ConnectionPoints[1].Side)
                     continue;
 
@@ -229,18 +232,57 @@ namespace TSMapEditor.Models
 
             IndicesInTileSet = indicesString.Split(',').Select(s => int.Parse(s, CultureInfo.InvariantCulture)).ToList();
 
-            ConnectionPoints = new TileConnectionPoint[2];
+            var connectionPointValues = new SortedDictionary<int, string>();
+
+            foreach (var keyValuePair in iniSection.Keys)
+            {
+                Match match = Regex.Match(keyValuePair.Key, "^ConnectionPoint(\\d+)$",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                if (!match.Success)
+                    continue;
+
+                if (!int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture,
+                    out int connectionPointIndex))
+                {
+                    throw new INIConfigException(
+                        $"Connected Tile {iniSection.SectionName} has an invalid connection point index in key {keyValuePair.Key}!");
+                }
+
+                if (!connectionPointValues.TryAdd(connectionPointIndex, keyValuePair.Value))
+                {
+                    throw new INIConfigException(
+                        $"Connected Tile {iniSection.SectionName} defines ConnectionPoint{connectionPointIndex} multiple times!");
+                }
+            }
+
+            if (!connectionPointValues.ContainsKey(0))
+                throw new INIConfigException($"Connected Tile {iniSection.SectionName} has no ConnectionPoint0!");
+
+            int expectedConnectionPointIndex = 0;
+            foreach (int connectionPointIndex in connectionPointValues.Keys)
+            {
+                if (connectionPointIndex != expectedConnectionPointIndex)
+                {
+                    throw new INIConfigException(
+                        $"Connected Tile {iniSection.SectionName} has no ConnectionPoint{expectedConnectionPointIndex}; " +
+                        "connection point indices must be contiguous!");
+                }
+
+                expectedConnectionPointIndex++;
+            }
+
+            ConnectionPoints = new TileConnectionPoint[connectionPointValues.Count];
 
             for (int i = 0; i < ConnectionPoints.Length; i++)
             {
-                string coordsString = iniSection.GetStringValue($"ConnectionPoint{i}", null);
+                string coordsString = connectionPointValues[i];
                 if (coordsString == null || !Regex.IsMatch(coordsString, "^\\d+?,\\d+?$"))
                     throw new INIConfigException($"Connected Tile {iniSection.SectionName} has invalid ConnectionPoint{i} value: {coordsString}!");
 
                 Point2D coords = Point2D.FromString(coordsString);
 
                 string directionsString = iniSection.GetStringValue($"ConnectionPoint{i}.Directions", null);
-                string[] directionParts = directionsString.Split(',');
+                string[] directionParts = directionsString?.Split(',') ?? Array.Empty<string>();
                 byte directions = 0;
 
                 // Try parsing the string as a comma-separated list of named directions
@@ -335,6 +377,15 @@ namespace TSMapEditor.Models
         /// </summary>
         public TileConnectionPoint[] ConnectionPoints { get; set; }
 
+        /// <summary>Whether this tile caps an open connected-tile path.</summary>
+        public bool IsEndingPiece => ConnectionPoints.Length == 1;
+
+        /// <summary>Whether this tile can be used by the legacy two-endpoint path drawer.</summary>
+        public bool IsLinear => ConnectionPoints.Length == 2;
+
+        /// <summary>Whether this tile has three or more possible connections.</summary>
+        public bool IsJunction => ConnectionPoints.Length >= 3;
+
         /// <summary>
         /// Set of all relative cell coordinates this tile occupies
         /// </summary>
@@ -352,17 +403,26 @@ namespace TSMapEditor.Models
 
         public TileConnectionPoint GetExit(int entryIndex)
         {
+            if (!IsLinear)
+                throw new InvalidOperationException("Only linear connected tiles have a single exit.");
+
             return ConnectionPoints[0].Index == entryIndex ? ConnectionPoints[1] : ConnectionPoints[0];
         }
 
         private bool IsStraight(TileConnectionPoint[] connectionPoints)
         {
+            if (connectionPoints.Length != 2)
+                return false;
+
             int mask = connectionPoints[0].ConnectionMask & connectionPoints[1].ReversedConnectionMask;
             return mask > 0;
         }
 
         private bool IsDiagonal(TileConnectionPoint[] connectionPoints)
         {
+            if (connectionPoints.Length != 2)
+                return false;
+
             var directions = Helpers.GetDirectionsInMask((byte)(connectionPoints[0].ConnectionMask &
                                                                 connectionPoints[1].ReversedConnectionMask));
 

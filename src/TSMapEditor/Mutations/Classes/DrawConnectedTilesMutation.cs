@@ -82,9 +82,8 @@ namespace TSMapEditor.Mutations.Classes
         private void FindConnectedTilePath(Point2D start, Point2D end, bool allowInstantTurn)
         {
             PriorityQueue<ConnectedTileAStarNode, (float FScore, int ExtraPriority)> openSet = new();
-            List<ConnectedTile> candidateTiles = allowInstantTurn
-                ? connectedTileType.Tiles
-                : connectedTileType.Tiles.FindAll(static tile => tile.ConnectionPoints[0].Side == tile.ConnectionPoints[1].Side);
+            List<ConnectedTile> candidateTiles = connectedTileType.Tiles.FindAll(tile =>
+                tile.IsLinear && (allowInstantTurn || tile.ConnectionPoints[0].Side == tile.ConnectionPoints[1].Side));
 
             ConnectedTileAStarNode bestNode = null;
             float bestDistance = float.PositiveInfinity;
