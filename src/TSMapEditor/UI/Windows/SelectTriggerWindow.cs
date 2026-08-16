@@ -37,8 +37,7 @@ public class SelectTriggerWindow : SelectObjectWindow<Trigger>
     protected override void LbObjectList_SelectedIndexChanged(object sender, EventArgs e)
     {
         if (lbObjectList.SelectedItem == null)
-        {
-            MinimumFuzzySearchScore = 25;
+        {            
             SelectedObject = null;
             return;
         }

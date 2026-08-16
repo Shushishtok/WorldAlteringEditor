@@ -11,6 +11,7 @@ public class TeamType : AbstractObject, IIDContainer, IHintable
     public TeamType(string iniName)
     {
         ININame = iniName;
+        Name = iniName;
     }
 
     public string GetInternalID() => ININame;

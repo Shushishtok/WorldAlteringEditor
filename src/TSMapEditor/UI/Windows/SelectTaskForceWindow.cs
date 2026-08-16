@@ -41,8 +41,7 @@ public class SelectTaskForceWindow : SelectObjectWindow<TaskForce>
     private void Map_ScriptingChanged(object sender, ScriptingChangedEventArgs e)
     {
         if (e.Affects<TaskForce>())
-        {
-            MinimumFuzzySearchScore = 25;            
+        {                       
             QueueScriptingRefresh(taskForce => map.TaskForces.Contains(taskForce) ||
                 (chkIncludeGlobalTaskForces.Checked && map.Rules.TaskForces.Contains(taskForce)));
         }

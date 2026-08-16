@@ -44,8 +44,7 @@ public class TaskforcesWindow : INItializableWindow
 
     private XNAContextMenu unitListContextMenu;
 
-    private TaskForce editedTaskForce;
-	private readonly int minimumFuzzySearchScore = 50;
+    private TaskForce editedTaskForce;	
 
     private TaskForceSortMode _taskForceSortMode;
     private TaskForceSortMode TaskForceSortMode

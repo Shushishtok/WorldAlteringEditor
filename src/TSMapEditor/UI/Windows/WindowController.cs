@@ -44,6 +44,11 @@ public class WindowController
     public TriggersWindow TriggersWindow { get; private set; }
     public TagsWindow TagsWindow { get; private set; }
     public AITriggersWindow AITriggersWindow { get; private set; }
+    public GeneralSettingsWizardStepWindow GeneralSettingsWizardStepWindow { get; private set; }
+    public TaskForceWizardStepWindow TaskForceWizardStepWindow { get; private set; }
+    public ScriptWizardStepWindow ScriptWizardStepWindow { get; private set; }
+    public TeamTypesWizardStepWindow TeamTypesWizardStepWindow { get; private set; }
+    public AITriggersWizardStepWindow AITriggersWizardStepWindow { get; private set; }
     public PlaceWaypointWindow PlaceWaypointWindow { get; private set; }
     public LocalVariablesWindow LocalVariablesWindow { get; private set; }
     public StructureOptionsWindow StructureOptionsWindow { get; private set; }
@@ -162,6 +167,21 @@ public class WindowController
         AITriggersWindow = new AITriggersWindow(windowParentControl.WindowManager, map);
         Windows.Add(AITriggersWindow);
 
+        GeneralSettingsWizardStepWindow = new GeneralSettingsWizardStepWindow(windowParentControl.WindowManager, map);
+        Windows.Add(GeneralSettingsWizardStepWindow);
+
+        TaskForceWizardStepWindow = new TaskForceWizardStepWindow(windowParentControl.WindowManager, map);
+        Windows.Add(TaskForceWizardStepWindow);
+
+        ScriptWizardStepWindow = new ScriptWizardStepWindow(windowParentControl.WindowManager, map);
+        Windows.Add(ScriptWizardStepWindow);
+
+        TeamTypesWizardStepWindow = new TeamTypesWizardStepWindow(windowParentControl.WindowManager, map);
+        Windows.Add(TeamTypesWizardStepWindow);
+
+        AITriggersWizardStepWindow = new AITriggersWizardStepWindow(windowParentControl.WindowManager, map);
+        Windows.Add(AITriggersWizardStepWindow);
+
         PlaceWaypointWindow = new PlaceWaypointWindow(windowParentControl.WindowManager, map, cursorActionTarget.MutationManager, cursorActionTarget.MutationTarget);
         Windows.Add(PlaceWaypointWindow);
 
@@ -262,6 +282,12 @@ public class WindowController
         InfantryOptionsWindow.TagOpened += Window_TagOpened;
         AircraftOptionsWindow.TagOpened += Window_TagOpened;
 
+        GeneralSettingsWizardStepWindow.TaskForceWizardStepOpened += GeneralSettingsWizardStepWindow_TaskForceWizardStepOpened;
+        TaskForceWizardStepWindow.ScriptsWizardStepOpened += TaskForceWizardStepWindow_ScriptsWizardStepOpened;
+        ScriptWizardStepWindow.ScriptsWindowOpened += ScriptWizardStepWindow_ScriptsWindowOpened;
+        ScriptWizardStepWindow.TeamTypeWizardStepOpened += ScriptWizardStepWindow_TeamTypeWizardStepOpened;
+        TeamTypesWizardStepWindow.AITriggersWizardStepWindowOpened += TeamTypesWizardStepWindow_AITriggersWizardStepWindowOpened;
+
         foreach (var window in Windows)
         {
             window.DrawOrder = ChildWindowOrderValue;
@@ -351,6 +377,35 @@ public class WindowController
         TeamTypesWindow.SelectTeamType(e.TeamType);
     }
 
+    private void GeneralSettingsWizardStepWindow_TaskForceWizardStepOpened(object sender, TaskForcesWizardStepEventArgs e)
+    {
+        TaskForceWizardStepWindow.WizardConfigurations = e.WizardConfigurations;
+        TaskForceWizardStepWindow.Open();
+    }
+
+    private void TaskForceWizardStepWindow_ScriptsWizardStepOpened(object sender, ScriptWizardStepEventArgs e)
+    {
+        ScriptWizardStepWindow.WizardConfigurations = e.WizardConfigurations;
+        ScriptWizardStepWindow.Open();
+    }
+
+    private void ScriptWizardStepWindow_ScriptsWindowOpened(object sender, ScriptWindowEventArgs e)
+    {
+        ScriptsWindow.Open();
+    }
+
+    private void ScriptWizardStepWindow_TeamTypeWizardStepOpened(object sender, TeamTypeWizardStepEventArgs e)
+    {
+        TeamTypesWizardStepWindow.WizardConfigurations = e.WizardConfigurations;
+        TeamTypesWizardStepWindow.Open();
+    }
+
+    private void TeamTypesWizardStepWindow_AITriggersWizardStepWindowOpened(object sender, AITriggersWizardStepEventArgs e)
+    {
+        AITriggersWizardStepWindow.WizardConfigurations = e.WizardConfigurations;
+        AITriggersWizardStepWindow.Open();
+    }
+
     private void TriggersWindow_TeamTypeOpened(object sender, TeamTypeEventArgs e) => AITriggersWindow_TeamTypeOpened(sender, e);
 
     private void ClearFocusSwitchHandlerFromChildrenRecursive(EditorWindow window, XNAControl control)
@@ -414,6 +469,8 @@ public class WindowController
         VehicleOptionsWindow.TagOpened -= Window_TagOpened;
         InfantryOptionsWindow.TagOpened -= Window_TagOpened;
         MapSizeWindow.OnResizeMapButtonClicked -= MapSizeWindow_OnResizeMapButtonClicked;
+
+        GeneralSettingsWizardStepWindow.TaskForceWizardStepOpened -= GeneralSettingsWizardStepWindow_TaskForceWizardStepOpened;
 
         foreach (var window in Windows)
         {

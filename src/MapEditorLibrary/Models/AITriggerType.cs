@@ -56,6 +56,7 @@ public class AITriggerType : IIDContainer
     public AITriggerType(string iniName)
     {
         ININame = iniName;
+        Name = iniName;
     }
 
     public string ININame { get; private set; }

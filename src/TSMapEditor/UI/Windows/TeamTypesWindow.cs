@@ -75,8 +75,7 @@ public class TeamTypesWindow : INItializableWindow
 
     private SelectTaskForceWindow selectTaskForceWindow;
     private SelectScriptWindow selectScriptWindow;
-    private SelectTagWindow selectTagWindow;
-	private readonly int minimumFuzzySearchScore = 50;
+    private SelectTagWindow selectTagWindow;	
 
     private TeamTypeSortMode _teamTypeSortMode;
     private TeamTypeSortMode TeamTypeSortMode

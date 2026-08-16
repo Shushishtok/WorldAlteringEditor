@@ -57,6 +57,7 @@ public class TaskForce : IIDContainer, IHintable
     public TaskForce(string iniName)
     {
         ININame = iniName;
+        Name = iniName;
     }
 
     public string GetInternalID() => ININame;

@@ -12,8 +12,7 @@ public abstract class SelectObjectWindow<T> : INItializableWindow
     {
         HasCloseButton = true;
     }
-
-    public int MinimumFuzzySearchScore = 25;
+    
     public event EventHandler ObjectSelected;
 
     protected EditorListBoxSearchTextBox tbSearch;

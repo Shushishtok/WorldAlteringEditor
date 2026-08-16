@@ -42,8 +42,7 @@ public class SelectTeamTypeWindow : SelectObjectWindow<TeamType>
     private void Map_ScriptingChanged(object sender, ScriptingChangedEventArgs e)
     {
         if (e.Affects<TeamType>())
-        {
-            MinimumFuzzySearchScore = 25;            
+        {                     
             QueueScriptingRefresh(teamType => map.TeamTypes.Contains(teamType) ||
                 (chkIncludeGlobalTeamTypes.Checked && map.Rules.TeamTypes.Contains(teamType)));
         }
