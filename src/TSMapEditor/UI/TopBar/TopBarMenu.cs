@@ -62,7 +62,7 @@ namespace TSMapEditor.UI.TopBar
             checkDistanceCursorAction = new CheckDistanceCursorAction(mapUI);
             checkDistancePathfindingCursorAction = new CheckDistancePathfindingCursorAction(mapUI);
             calculateTiberiumValueCursorAction = new CalculateTiberiumValueCursorAction(mapUI);
-            manageBaseNodesCursorAction = new ManageBaseNodesCursorAction(mapUI, WindowManager);
+            manageBaseNodesCursorAction = new ManageBaseNodesCursorAction(mapUI);
             placeVeinholeMonsterCursorAction = new PlaceVeinholeMonsterCursorAction(mapUI);
 
             selectBridgeWindow = new SelectBridgeWindow(WindowManager, map);
@@ -139,7 +139,7 @@ namespace TSMapEditor.UI.TopBar
                 if (cliffCount == 1)
                 {
                     editContextMenu.AddItem(Translate(this, "Edit.DrawConnectedTiles", "Draw Connected Tiles"), () => mapUI.EditorState.CursorAction =
-                        new DrawCliffCursorAction(mapUI, theaterMatchingCliffs[0]), null, null, null);
+                        new DrawConnectedTilesCursorAction(mapUI, theaterMatchingCliffs[0]), null, null, null);
                 }
                 else
                 {
@@ -240,6 +240,7 @@ namespace TSMapEditor.UI.TopBar
             scriptingContextMenu.Name = nameof(scriptingContextMenu);
             scriptingContextMenu.AddItem(Translate(this, "Scipting.Houses", "Houses"), () => windowController.HousesWindow.Open(), null, null, null);
             scriptingContextMenu.AddItem(Translate(this, "Scripting.Triggers", "Triggers"), () => windowController.TriggersWindow.Open(), null, null, null);
+            scriptingContextMenu.AddItem(Translate(this, "Scripting.Tags", "Tags"), () => windowController.TagsWindow.Open(), null, null, null);
             scriptingContextMenu.AddItem(Translate(this, "Scripting.TaskForces", "TaskForces"), () => windowController.TaskForcesWindow.Open(), null, null, null);
             scriptingContextMenu.AddItem(Translate(this, "Scripting.Scripts", "Scripts"), () => windowController.ScriptsWindow.Open(), null, null, null);
             scriptingContextMenu.AddItem(Translate(this, "Scripting.TeamTypes", "TeamTypes"), () => windowController.TeamTypesWindow.Open(), null, null, null);
@@ -453,7 +454,7 @@ namespace TSMapEditor.UI.TopBar
 
         private void SelectConnectedTileWindow_ObjectSelected(object sender, EventArgs e)
         {
-            mapUI.EditorState.CursorAction = new DrawCliffCursorAction(mapUI, windowController.SelectConnectedTileWindow.SelectedObject);
+            mapUI.EditorState.CursorAction = new DrawConnectedTilesCursorAction(mapUI, windowController.SelectConnectedTileWindow.SelectedObject);
         }
 
         private void Open()

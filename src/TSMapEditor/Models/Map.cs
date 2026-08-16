@@ -1,13 +1,13 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Rampastring.Tools;
-using Rampastring.XNAUI.XNAControls;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using TSMapEditor.CCEngine;
+using TSMapEditor.CCEngine.TileData;
 using TSMapEditor.Extensions;
 using TSMapEditor.GameMath;
 using TSMapEditor.Initialization;
@@ -369,18 +369,21 @@ namespace TSMapEditor.Models
             }
         }
 
-        private void ReloadSections()
+        public void ReinitializeLighting()
         {
-            MapLoader.ReadBasicSection(this, LoadedINI);
-
             // Refresh light posts in case they got their INI config changed - saves the user
             // from having to reload the map to refresh lighting changes
             // Lighting.ReadFromIniFile will afterwards refresh lighting of all cells, so we don't
             // need to do it separately for cells lit by the building
             Rules.BuildingTypes.ForEach(bt => initializer.ReadObjectTypePropertiesFromINI(bt, LoadedINI));
             Structures.ForEach(s => s.LightTiles(Tiles));
-
             Lighting.ReadFromIniFile(LoadedINI);
+        }
+
+        private void ReloadSections()
+        {
+            MapLoader.ReadBasicSection(this, LoadedINI);
+            ReinitializeLighting();
         }
 
         public void Save()
@@ -1857,6 +1860,11 @@ namespace TSMapEditor.Models
             }
 
             return null;
+        }
+
+        public bool IsCellMorphable(MapTile cell)
+        {
+            return TheaterInstance.Theater.TileSets[TheaterInstance.GetTileSetId(cell.TileIndex)].Morphable;
         }
 
         public void Clear()

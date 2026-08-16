@@ -1,19 +1,22 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using TSMapEditor.CCEngine.TileData;
 using TSMapEditor.GameMath;
 using TSMapEditor.Models;
+using TSMapEditor.Mutations;
 using TSMapEditor.Mutations.Classes;
-using TSMapEditor.Rendering;
 
 namespace TSMapEditor.UI.CursorActions
 {
-    public class OverlayCollectionPlacementAction : CursorAction
+    public class OverlayCollectionPlacementAction : LineAndRegularPaintingAction
     {
         public OverlayCollectionPlacementAction(ICursorActionTarget cursorActionTarget) : base(cursorActionTarget)
         {
         }
 
         public override string GetName() => Translate("Name", "Place Overlay Collection");
+
+        protected override bool ClearPreviousCellOnMouseUp => true;
 
         private OverlayCollection _overlayCollection;
         public OverlayCollection OverlayCollection
@@ -46,8 +49,20 @@ namespace TSMapEditor.UI.CursorActions
         private int[] randomizedOverlayCollectionEntryIndexes;
         private OverlayCollection lastRandomizedCollection = null;
 
+        public override void OnActionExit()
+        {
+            ClearLinePreview();
+            base.OnActionExit();
+        }
+
         public override void PreMapDraw(Point2D cellCoords)
         {
+            if (LineSourceCell.HasValue)
+            {
+                ApplyLinePreview(cellCoords);
+                return;
+            }
+
             originalOverlay.Clear();
 
             int brushSize = CursorActionTarget.BrushSize.Width * CursorActionTarget.BrushSize.Height;
@@ -115,6 +130,12 @@ namespace TSMapEditor.UI.CursorActions
 
         public override void PostMapDraw(Point2D cellCoords)
         {
+            if (LineSourceCell.HasValue)
+            {
+                ClearLinePreview();
+                return;
+            }
+
             int index = 0;
 
             CursorActionTarget.BrushSize.DoForBrushSize(offset =>
@@ -154,12 +175,26 @@ namespace TSMapEditor.UI.CursorActions
             CursorActionTarget.AddRefreshPoint(cellCoords, Math.Max(CursorActionTarget.BrushSize.Height, CursorActionTarget.BrushSize.Width));
         }
 
-        public override void LeftDown(Point2D cellCoords)
+        protected override bool CanDrawLinePreview() => _overlayCollection != null;
+
+        protected override ICheckableMutation CreateRegularPlacementMutation(Point2D cellCoords)
         {
-            var mutation = new PlaceOverlayCollectionMutation(CursorActionTarget.MutationTarget, OverlayCollection, cellCoords);
-            CursorActionTarget.MutationManager.PerformMutation(mutation);
+            return new PlaceOverlayCollectionMutation(CursorActionTarget.MutationTarget, OverlayCollection, cellCoords);
         }
 
-        public override void LeftClick(Point2D cellCoords) => LeftDown(cellCoords);
+        protected override Mutation CreateLinePlacementMutation(Direction direction, int length)
+        {
+            return new PlaceOverlayCollectionLineMutation(MutationTarget, OverlayCollection, LineSourceCell.Value, direction, length);
+        }
+
+        protected override void ApplyLine(Point2D cellCoords)
+        {
+            if (_overlayCollection != null)
+            {
+                (Direction direction, int length) = GetLineInformation(cellCoords);
+                var mutation = CreateLinePlacementMutation(direction, length);
+                PerformMutation(mutation);
+            }
+        }
     }
 }

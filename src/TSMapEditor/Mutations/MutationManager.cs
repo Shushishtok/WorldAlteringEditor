@@ -7,14 +7,14 @@ namespace TSMapEditor.Mutations
     /// </summary>
     public class MutationManager
     {
-        public List<Mutation> UndoList { get; } = new List<Mutation>();
-        public List<Mutation> RedoList { get; } = new List<Mutation>();
+        public List<IMutation> UndoList { get; } = new List<IMutation>();
+        public List<IMutation> RedoList { get; } = new List<IMutation>();
 
         /// <summary>
         /// Performs a new mutation on the map.
         /// </summary>
         /// <param name="mutation">The mutation to perform.</param>
-        public void PerformMutation(Mutation mutation)
+        public void PerformMutation(IMutation mutation)
         {
             mutation.Perform();
             RedoList.Clear();
@@ -45,6 +45,11 @@ namespace TSMapEditor.Mutations
                 UndoOne();
             }
         }
+
+        /// <summary>
+        /// Returns the latest mutation performed to the map.
+        /// </summary>
+        public IMutation GetLatestMutation() => UndoList.Count > 0 ? UndoList[^1] : null;
 
         /// <summary>
         /// Undoes the last mutation performed to the map.

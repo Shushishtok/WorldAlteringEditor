@@ -3,9 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TSMapEditor.CCEngine;
+using TSMapEditor.CCEngine.TileData;
 using TSMapEditor.Models;
 using TSMapEditor.Models.Enums;
-using TSMapEditor.Rendering;
 
 namespace TSMapEditor.Misc
 {
@@ -40,12 +40,15 @@ namespace TSMapEditor.Misc
                                 cell.CoordsToPoint()));
                     }
 
-                    // Check for tiberium on ramps that don't support tiberium on them
-                    if (subTile.TmpImage.RampType > RampType.South)
+                    if (!Constants.IsRA2YR)
                     {
-                        issueList.Add(string.Format(Translate(map, "CheckForIssues.TiberiumUnsupportedRamp",
-                            "Cell at {0} has Tiberium on a ramp that does not allow Tiberium on it. This can crash the game!"),
-                                cell.CoordsToPoint()));
+                        // Check for tiberium on ramps that don't support tiberium on them
+                        if (subTile.TmpImage.RampType > RampType.South)
+                        {
+                            issueList.Add(string.Format(Translate(map, "CheckForIssues.TiberiumUnsupportedRamp",
+                                "Cell at {0} has Tiberium on a ramp that does not allow Tiberium on it. This can crash the game!"),
+                                    cell.CoordsToPoint()));
+                        }
                     }
                 }
             });
@@ -66,12 +69,26 @@ namespace TSMapEditor.Misc
             map.TeamTypes.ForEach(tt =>
             {
                 if (tt.TaskForce == null)
+                {
                     issueList.Add(string.Format(Translate(map, "CheckForIssues.TeamTypeWithoutTaskForce",
                         "TeamType \"{0}\" has no TaskForce set!"), tt.Name));
+                }
 
                 if (tt.Script == null)
+                {
                     issueList.Add(string.Format(Translate(map, "CheckForIssues.TeamTypeWithoutScript",
                         "TeamType \"{0}\" has no Script set!"), tt.Name));
+                }
+            });
+
+            // Check for Tags having no Triggers attached to them
+            map.Tags.ForEach(tag =>
+            {
+                if (tag.Trigger == null)
+                {
+                    issueList.Add(string.Format(Translate(map, "CheckForIssues.TagWithoutTrigger",
+                        "Tag \"{0}\" ({1}) has no Trigger set!"), tag.Name, tag.ID));
+                }
             });
 
             // Check for triggers that are disabled and are never enabled by any other triggers

@@ -513,12 +513,12 @@ namespace TSMapEditor.UI.Windows
                     int waypointIdentifier = Helpers.GetWaypointNumberFromAlphabeticalString(currentParameterValue);
                     if (Cursor.ScrollWheelValue < 0 && map.Waypoints.Exists(wp => wp.Identifier == waypointIdentifier + 1))
                     {
-                        textBox.Text = Helpers.WaypointNumberToAlphabeticalString(waypointIdentifier + 1);
+                        textBox.Text = (waypointIdentifier + 1).ToString(CultureInfo.InvariantCulture);
                         EditTrigger(editedTrigger);
                     }
                     else if (Cursor.ScrollWheelValue > 0 && map.Waypoints.Exists(wp => wp.Identifier == waypointIdentifier - 1))
                     {
-                        textBox.Text = Helpers.WaypointNumberToAlphabeticalString(waypointIdentifier - 1);
+                        textBox.Text = (waypointIdentifier - 1).ToString(CultureInfo.InvariantCulture);
                         EditTrigger(editedTrigger);
                     }
                     break;
@@ -723,6 +723,7 @@ namespace TSMapEditor.UI.Windows
             var stringBuilder = new StringBuilder();
 
             var tag = map.Tags.Find(t => t.Trigger == editedTrigger);
+
             if (tag == null)
             {
                 stringBuilder.Append(string.Format(Translate(this, "NoAssociatedTag", "The selected trigger {0} has no associated tag. As such, it is not attached to any objects."), editedTrigger.Name));
@@ -764,24 +765,22 @@ namespace TSMapEditor.UI.Windows
                 }
 
                 var teamTypes = map.TeamTypes.FindAll(tt => tt.Tag == tag);
-                if (teamTypes.Count > 0)
+                foreach (var teamType in teamTypes)
                 {
-                    foreach (var teamType in teamTypes)
-                    {
-                        stringBuilder.Append(string.Format(Translate(this, "TeamTypeReferences", "The trigger is linked to TeamType '{0}' ({1})."), teamType.Name, teamType.ININame));
-                        stringBuilder.Append(Environment.NewLine);
-                    }
+                    stringBuilder.Append(string.Format(Translate(this, "TeamTypeReferences", "The trigger is linked to TeamType '{0}' ({1})."), teamType.Name, teamType.ININame));
+                    stringBuilder.Append(Environment.NewLine);
                 }
 
                 var celltag = map.CellTags.Find(ct => ct.Tag == tag);
                 if (celltag != null)
                 {
-                    stringBuilder.Append(Environment.NewLine);
                     stringBuilder.Append(string.Format(Translate(this, "LinkedCellTags", "The trigger is linked to one or more celltags (first match at {0})."), celltag.Position));
+                    stringBuilder.Append(Environment.NewLine);
                 }
             }
 
             // Check other triggers to see whether this trigger is referenced by them
+            bool selfReference = false;
             var allReferringTriggers = map.Triggers.FindAll(trig =>
             {
                 foreach (var triggerAction in trig.Actions)
@@ -796,6 +795,12 @@ namespace TSMapEditor.UI.Windows
                         string paramValue = triggerAction.Parameters[i];
                         if (actionType.Parameters[i].TriggerParamType == TriggerParamType.Trigger && paramValue == editedTrigger.ID)
                         {
+                            if (trig == editedTrigger)
+                            {
+                                selfReference = true;
+                                return false;
+                            }
+
                             return true;
                         }
                     }
@@ -809,14 +814,45 @@ namespace TSMapEditor.UI.Windows
 
             if (allReferringTriggers.Count > 0)
             {
-                stringBuilder.Append(Environment.NewLine);
                 stringBuilder.Append(Translate(this, "TriggerReferences", "The trigger is referenced by the following other triggers:"));
                 allReferringTriggers.ForEach(trig => stringBuilder.Append(Environment.NewLine + string.Format(Translate(this, "TriggerReference", "    - {0} ({1})"), trig.Name, trig.ID)));
+                stringBuilder.Append(Environment.NewLine);
+                stringBuilder.Append(Environment.NewLine);
+            }
+
+            if (selfReference)
+            {
+                stringBuilder.Append(Translate(this, "SelfReference", "The trigger is referenced by one or more of its own actions."));
+                stringBuilder.Append(Environment.NewLine);
+                stringBuilder.Append(Environment.NewLine);
+            }
+
+            // Gather all triggers linked to this trigger
+            List<Trigger> linkedTriggers = new List<Trigger>();
+            var linked = editedTrigger.LinkedTrigger;
+            while (linked != null)
+            {
+                // Prevent infinite loop if there's a loop of linked triggers
+                if (linkedTriggers.Contains(linked))
+                    break;
+
+                linkedTriggers.Add(linked);
+
+                linked = linked.LinkedTrigger;
+            }
+
+            var triggersReferencingTag = map.Triggers.FindAll(linkedTriggers.Contains);
+
+            if (triggersReferencingTag.Count > 0)
+            {
+                stringBuilder.Append(Translate(this, "TriggersLinkedToSelectedTrigger", "The following other triggers are linked to the trigger:"));
+                triggersReferencingTag.ForEach(trig => stringBuilder.Append(Environment.NewLine + string.Format(Translate(this, "TriggerReference", "    - {0} ({1})"), trig.Name, trig.ID)));
+                stringBuilder.Append(Environment.NewLine);
             }
 
             if (stringBuilder.Length == 0)
             {
-                EditorMessageBox.Show(WindowManager, 
+                EditorMessageBox.Show(WindowManager,
                     Translate(this, "LinkedObjects.Title", "Linked Objects"),
                     string.Format(Translate(this, "NoLinkedObjects.Description", "The selected trigger '{0}' is not linked to any objects, CellTags or other triggers."), editedTrigger.Name),
                     MessageBoxButtons.OK);
@@ -1362,20 +1398,22 @@ namespace TSMapEditor.UI.Windows
                 return;
             }
 
+            string paramValue = triggerAction.Parameters[paramIndex];
+
             switch (parameter.TriggerParamType)
             {
                 case TriggerParamType.Animation:
-                    AnimType existingAnimType = map.Rules.AnimTypes.Find(at => at.Index == Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1));
+                    AnimType existingAnimType = map.Rules.AnimTypes.Find(at => at.Index == Conversions.IntFromString(paramValue, -1));
                     selectAnimationWindow.IsForEvent = false;
                     selectAnimationWindow.Open(existingAnimType);
                     break;
                 case TriggerParamType.TeamType:
-                    TeamType existingTeamType = map.TeamTypes.Find(tt => tt.ININame == triggerAction.Parameters[paramIndex]);
+                    TeamType existingTeamType = map.TeamTypes.Find(tt => tt.ININame == paramValue);
                     selectTeamTypeWindow.IsForEvent = false;
                     selectTeamTypeWindow.Open(existingTeamType);
                     break;
                 case TriggerParamType.Trigger:
-                    Trigger existingTrigger = map.Triggers.Find(tt => tt.ID == triggerAction.Parameters[paramIndex]);
+                    Trigger existingTrigger = map.Triggers.Find(tt => tt.ID == paramValue);
                     isAttachingTrigger = false;
                     selectTriggerWindow.Open(existingTrigger);
                     break;
@@ -1400,7 +1438,7 @@ namespace TSMapEditor.UI.Windows
                     // selectLocalVariableWindow.Open(existingLocalVariable);
                     break;
                 case TriggerParamType.HouseType:
-                    int houseTypeIndex = Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1);
+                    int houseTypeIndex = Conversions.IntFromString(paramValue, -1);
                     selectHouseTypeWindow.IsForEvent = false;
                     if (houseTypeIndex > -1 && houseTypeIndex < map.GetHouseTypes().Count)
                         selectHouseTypeWindow.Open(map.GetHouseTypes()[houseTypeIndex]);
@@ -1408,7 +1446,7 @@ namespace TSMapEditor.UI.Windows
                         selectHouseTypeWindow.Open(null);
                     break;
                 case TriggerParamType.House:
-                    int houseIndex = Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1);
+                    int houseIndex = Conversions.IntFromString(paramValue, -1);
                     selectHouseWindow.IsForEvent = false;
                     if (houseIndex > -1 && houseIndex < map.GetHouses().Count)
                         selectHouseWindow.Open(map.GetHouses()[houseIndex]);
@@ -1416,13 +1454,13 @@ namespace TSMapEditor.UI.Windows
                         selectHouseWindow.Open(null);
                     break;
                 case TriggerParamType.Text:
-                    selectTutorialLineWindow.Open(new TutorialLine(Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1), string.Empty));
+                    selectTutorialLineWindow.Open(new TutorialLine(Conversions.IntFromString(paramValue, -1), string.Empty));
                     break;
                 case TriggerParamType.Theme:
-                    selectThemeWindow.Open(map.Rules.Themes.Get(Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1)));
+                    selectThemeWindow.Open(map.Rules.Themes.Get(Conversions.IntFromString(paramValue, -1)));
                     break;
                 case TriggerParamType.Tag:
-                    Tag existingTag = map.Tags.Find(tag => tag.ID == triggerAction.Parameters[paramIndex]);
+                    Tag existingTag = map.Tags.Find(tag => tag.ID == paramValue);
                     selectTagWindow.IsForEvent = false;
                     selectTagWindow.Open(existingTag);
                     break;
@@ -1434,58 +1472,65 @@ namespace TSMapEditor.UI.Windows
                     ctxActionParameterPresetValues.Open(GetCursorPoint());
                     break;
                 case TriggerParamType.StringTableEntry:
-                    string label = triggerAction.Parameters[paramIndex];
+                    string label = paramValue;
                     CsfString existingString = map.StringTable.LookUpString(label) ?? new(label, string.Empty);
                     selectStringWindow.IsForEvent = false;
                     selectStringWindow.Open(existingString);
                     break;
                 case TriggerParamType.SuperWeapon:
-                    int swTypeIndex = Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1);
+                    int swTypeIndex = Conversions.IntFromString(paramValue, -1);
                     selectSuperWeaponTypeWindow.IsForEvent = false;
                     selectSuperWeaponTypeWindow.UseININameAsValue = false;
                     if (swTypeIndex > -1 && swTypeIndex < map.Rules.SuperWeaponTypes.Count)
                         selectSuperWeaponTypeWindow.Open(map.Rules.SuperWeaponTypes[swTypeIndex]);
                     break;
                 case TriggerParamType.SuperWeaponName:
-                    string swTypeID = triggerAction.Parameters[paramIndex];
+                    string swTypeID = paramValue;
                     selectSuperWeaponTypeWindow.IsForEvent = false;
                     selectSuperWeaponTypeWindow.UseININameAsValue = true;
                     if (!string.IsNullOrEmpty(swTypeID))
                         selectSuperWeaponTypeWindow.Open(map.Rules.SuperWeaponTypes.Find(swType => swType.ININame.Equals(swTypeID, StringComparison.Ordinal)));
                     break;
                 case TriggerParamType.ParticleSystem:
-                    ParticleSystemType existingParticleSystemType = map.Rules.ParticleSystemTypes.Find(pst => pst.Index == Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1));
+                    ParticleSystemType existingParticleSystemType = map.Rules.ParticleSystemTypes.Find(pst => pst.Index == Conversions.IntFromString(paramValue, -1));
                     selectParticleSystemTypeWindow.IsForEvent = false;
                     selectParticleSystemTypeWindow.Open(existingParticleSystemType);
                     break;
                 case TriggerParamType.Speech:
                     selectSpeechWindow.IsForEvent = false;
                     EvaSpeech speech = Constants.IsRA2YR
-                        ? map.Rules.Speeches.Get(triggerAction.Parameters[paramIndex])
-                        : map.EditorConfig.Speeches.Get(Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1));
+                        ? map.Rules.Speeches.Get(paramValue)
+                        : map.EditorConfig.Speeches.Get(Conversions.IntFromString(paramValue, -1));
                     selectSpeechWindow.Open(speech);
                     break;
                 case TriggerParamType.Sound:
                     selectSoundWindow.IsForEvent = false;
                     Sound sound = Constants.IsRA2YR
-                        ? map.Rules.Sounds.Get(triggerAction.Parameters[paramIndex])
-                        : map.Rules.Sounds.Get(Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1));
+                        ? map.Rules.Sounds.Get(paramValue)
+                        : map.Rules.Sounds.Get(Conversions.IntFromString(paramValue, -1));
                     selectSoundWindow.Open(sound);
                     break;
                 case TriggerParamType.BuildingName:
                     selectBuildingTypeWindow.IsForEvent = false;
                     selectBuildingTypeWindow.Tag = TriggerParamType.BuildingName;
-                    BuildingType buildingType = map.Rules.BuildingTypes.Find(bt => bt.ININame == triggerAction.Parameters[paramIndex]);
+                    BuildingType buildingType = map.Rules.BuildingTypes.Find(bt => bt.ININame == paramValue);
                     selectBuildingTypeWindow.Open(buildingType);
                     break;
+                case TriggerParamType.Building:
+                    selectBuildingTypeWindow.IsForEvent = false;
+                    int buildingTypeId = Conversions.IntFromString(paramValue, -1);
+                    BuildingType existingBuilding = buildingTypeId < 0 || buildingTypeId >= map.Rules.BuildingTypes.Count ? null : map.Rules.BuildingTypes[buildingTypeId];
+                    selectBuildingTypeWindow.Tag = TriggerParamType.Building;
+                    selectBuildingTypeWindow.Open(existingBuilding);
+                    break;
                 case TriggerParamType.Color:
-                    int colorIndex = Conversions.IntFromString(triggerAction.Parameters[paramIndex], -1);
+                    int colorIndex = Conversions.IntFromString(paramValue, -1);
                     selectColorsWindow.IsForEvent = false;
                     if (colorIndex > -1 && colorIndex < map.Rules.Colors.Count)
                         selectColorsWindow.Open(map.Rules.Colors[colorIndex]);
                     else
                         selectColorsWindow.Open(null);
-                    break;                    
+                    break;
                 default:
                     break;
             }
@@ -2010,6 +2055,9 @@ namespace TSMapEditor.UI.Windows
                         {
                             action.Parameters[parameterIndex] = (selectTutorialLineWindow.SelectedObject.ID + 1).ToString(CultureInfo.InvariantCulture);
                         }
+                        break;
+                    case TriggerParamType.Number:
+                        action.Parameters[parameterIndex] = "0";
                         break;
                 }
             }
@@ -2739,7 +2787,7 @@ namespace TSMapEditor.UI.Windows
 
         private Color GetParamValueColor(string paramValue, TriggerParamType paramType)
         {
-            bool intParseSuccess = int.TryParse(paramValue, NumberStyles.None, CultureInfo.InvariantCulture, out int intValue);
+            bool intParseSuccess = int.TryParse(paramValue, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int intValue);
 
             switch (paramType)
             {
@@ -2790,7 +2838,7 @@ namespace TSMapEditor.UI.Windows
 
         private string GetParamValueText(string paramValue, TriggerParamType paramType, List<string> presetOptions)
         {
-            bool intParseSuccess = int.TryParse(paramValue, NumberStyles.None, CultureInfo.InvariantCulture, out int intValue);
+            bool intParseSuccess = int.TryParse(paramValue, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int intValue);
             if (paramValue == null)
                 paramValue = string.Empty;
 
@@ -2997,7 +3045,7 @@ namespace TSMapEditor.UI.Windows
 
         private string GetObjectValueText<T>(RTTIType rtti, List<T> objectTypeList, string paramValue) where T : TechnoType
         {
-            bool intParseSuccess = int.TryParse(paramValue, NumberStyles.None, CultureInfo.InvariantCulture, out int intValue);
+            bool intParseSuccess = int.TryParse(paramValue, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int intValue);
 
             if (!intParseSuccess)
                 return paramValue;

@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using TSMapEditor.CCEngine;
+using TSMapEditor.CCEngine.TileData;
 using TSMapEditor.GameMath;
 using TSMapEditor.Models;
 using TSMapEditor.Rendering.Batching;
@@ -34,9 +35,14 @@ namespace TSMapEditor.Rendering
     /// </summary>
     public class GraphicsPreparationClass
     {
-        public GraphicsPreparationClass() 
+        public GraphicsPreparationClass(int width = RenderingConstants.MaximumDX11TextureSize, int height = RenderingConstants.MaximumDX11TextureSize) 
         {
+            SheetWidth = width;
+            SheetHeight = height;
         }
+
+        public int SheetWidth { get; }
+        public int SheetHeight { get; }
 
         public List<SpriteSheetPreparation> SpriteSheetPreparationObjects { get; } = new List<SpriteSheetPreparation>();
 
@@ -48,7 +54,7 @@ namespace TSMapEditor.Rendering
 
         public SpriteSheetPreparation GenerateNewSpriteSheetWorkingObject()
         {
-            var spriteSheetPreparation = new SpriteSheetPreparation();
+            var spriteSheetPreparation = new SpriteSheetPreparation(SheetWidth, SheetHeight);
 
             lock (locker)
             {
@@ -83,7 +89,17 @@ namespace TSMapEditor.Rendering
     /// </summary>
     public class SpriteSheetPreparation
     {
-        public byte[] WorkingBuffer = new byte[RenderingConstants.MaximumDX11TextureSize * RenderingConstants.MaximumDX11TextureSize];
+        public SpriteSheetPreparation(int width, int height)
+        {
+            WorkingBufferWidth = width;
+            WorkingBufferHeight = height;
+            WorkingBuffer = new byte[WorkingBufferWidth * WorkingBufferHeight];
+        }
+
+        public int WorkingBufferWidth { get; }
+        public int WorkingBufferHeight { get; }
+
+        public readonly byte[] WorkingBuffer;
         public int maxX = 0;                        // Width of the whole mega-texture (width of the widest row of images).
         public int maxY = 0;                        // Height of the whole mega-texture (height of all rows summed).
         public int X { get; private set; } = 0;     // Horizontal start position of the next tile.
@@ -108,21 +124,21 @@ namespace TSMapEditor.Rendering
 
         public bool CanFitTexture(int width, int height)
         {
-            if (width >= RenderingConstants.MaximumDX11TextureSize || height >= RenderingConstants.MaximumDX11TextureSize)
-                throw new ArgumentException("Texture too large for DirectX11: " + width + "x" + height);
+            if (width >= WorkingBufferWidth || height >= WorkingBufferHeight)
+                throw new ArgumentException("Texture too large: " + width + "x" + height);
 
             // Check if fits on current row
-            if (X + width < RenderingConstants.MaximumDX11TextureSize)
+            if (X + width < WorkingBufferWidth)
             {
-                if (Y + height < RenderingConstants.MaximumDX11TextureSize)
+                if (Y + height < WorkingBufferHeight)
                 {
                     return true;
                 }
             }
 
             // If not, check if the texture would fit if placed on a new row
-            if (width < RenderingConstants.MaximumDX11TextureSize &&
-                Y + rowHeight + height < RenderingConstants.MaximumDX11TextureSize)
+            if (width < WorkingBufferWidth &&
+                Y + rowHeight + height < WorkingBufferHeight)
             {
                 return true;
             }
@@ -135,7 +151,7 @@ namespace TSMapEditor.Rendering
             if (imageData.Length != width * height)
                 throw new ArgumentException($"{nameof(SpriteSheetPreparation)}: Image data needs to match width x height. Expected size: {width * height}, actual: {imageData}");
 
-            if (X + width > RenderingConstants.MaximumDX11TextureSize)
+            if (X + width > WorkingBufferWidth)
             {
                 // Advance to next row
                 maxX = Math.Max(maxX, X);
@@ -143,7 +159,7 @@ namespace TSMapEditor.Rendering
                 Y += rowHeight;
                 rowHeight = 0;
 
-                if (Y + height > RenderingConstants.MaximumDX11TextureSize)
+                if (Y + height > WorkingBufferHeight)
                 {
                     throw new InvalidOperationException("Image does not fit on MegaTexture!");
                 }
@@ -155,7 +171,7 @@ namespace TSMapEditor.Rendering
             // Copy buffer
             for (int h = 0; h < height; h++)
             {
-                Buffer.BlockCopy(imageData, h * width, WorkingBuffer, (Y + h) * RenderingConstants.MaximumDX11TextureSize + X, width);
+                Buffer.BlockCopy(imageData, h * width, WorkingBuffer, (Y + h) * WorkingBufferWidth + X, width);
             }
 
             if (height > rowHeight)
@@ -313,7 +329,7 @@ namespace TSMapEditor.Rendering
     /// <summary>
     /// Graphical layer for the theater.
     /// </summary>
-    public class TheaterGraphics : ITheater
+    public class TheaterGraphics : ITheater, ITheaterTileData
     {
         private const string SHP_FILE_EXTENSION = ".SHP";
         private const string VXL_FILE_EXTENSION = ".VXL";
@@ -333,22 +349,24 @@ namespace TSMapEditor.Rendering
         private readonly XNAPalette tiberiumPalette;
         private readonly XNAPalette animPalette;
         private readonly XNAPalette alphaPalette;
+        private readonly XNAPalette palettePalette;
         private readonly VplFile vplFile;
 
         private readonly List<XNAPalette> palettes = new List<XNAPalette>();
 
         private List<GraphicsPreparationClass> graphicsPreparationObjects = new List<GraphicsPreparationClass>();
         private List<Texture2D> spriteSheets = new List<Texture2D>();
-        private List<TileImage[]> terrainGraphicsList = new List<TileImage[]>();
-        private List<TileImage[]> mmTerrainGraphicsList = new List<TileImage[]>();
+        private List<MGTileImage[]> terrainGraphicsList = new List<MGTileImage[]>();
+        private List<MGTileImage[]> mmTerrainGraphicsList = new List<MGTileImage[]>();
         private List<bool> hasMMGraphics = new List<bool>();
 
         public int TileCount => terrainGraphicsList.Count;
 
-        public TileImage GetTileGraphics(int id) => terrainGraphicsList[id][random.Next(terrainGraphicsList[id].Length)];
-        public TileImage GetTileGraphics(int id, int variantId) => terrainGraphicsList[id][variantId];
-        public TileImage GetMarbleMadnessTileGraphics(int id) => mmTerrainGraphicsList[id][0];
+        public MGTileImage GetTileGraphics(int id) => terrainGraphicsList[id][random.Next(terrainGraphicsList[id].Length)];
+        public MGTileImage GetTileGraphics(int id, int variantId) => terrainGraphicsList[id][variantId];
+        public MGTileImage GetMarbleMadnessTileGraphics(int id) => mmTerrainGraphicsList[id][0];
         public bool HasSeparateMarbleMadnessTileGraphics(int id) => hasMMGraphics[id];
+        public TileImage GetTileImage(int id) => terrainGraphicsList[id][0];
 
         public ITileImage GetTile(int id) => GetTileGraphics(id);
 
@@ -368,6 +386,8 @@ namespace TSMapEditor.Rendering
         public ShapeImage[] AnimTextures { get; set; }
         public Dictionary<string, ShapeImage> AlphaImages { get; set; } = new Dictionary<string, ShapeImage>();
 
+        public ShapeImage PipTextures { get; set; }
+
         private readonly object graphicsPreparationObjectLocker = new object();
 
         public TheaterGraphics(GraphicsDevice graphicsDevice, Theater theater, CCFileManager fileManager, Rules rules)
@@ -380,6 +400,7 @@ namespace TSMapEditor.Rendering
             unitPalette = GetPaletteOrFail(Theater.UnitPaletteName, true);
             animPalette = GetPaletteOrFail("anim.pal", true);
             tiberiumPalette = string.IsNullOrEmpty(Theater.TiberiumPaletteName) ? TheaterPalette : GetPaletteOrFail(Theater.TiberiumPaletteName, false);
+            palettePalette = GetPaletteOrFail("palette.pal", true);
             vplFile = GetVplFile();
 
             RGBColor[] alphaPaletteColors = new RGBColor[Palette.LENGTH];
@@ -404,7 +425,8 @@ namespace TSMapEditor.Rendering
                 var task13 = Task.Factory.StartNew(() => ReadSmudgeTextures(rules.SmudgeTypes));
                 var task14 = Task.Factory.StartNew(() => ReadAnimTextures(rules.AnimTypes, rules.BuildingTypes));
                 var task15 = Task.Factory.StartNew(() => ReadAlphaImages(rules));
-                Task.WaitAll(task1, task2, task3, task4, task5, task6, task7, task8, task9, task10, task11, task12, task13, task14, task15);
+                var task16 = Task.Factory.StartNew(() => ReadMiscTextures());
+                Task.WaitAll(task1, task2, task3, task4, task5, task6, task7, task8, task9, task10, task11, task12, task13, task14, task15, task16);
             }
             else
             {
@@ -423,6 +445,7 @@ namespace TSMapEditor.Rendering
                 ReadSmudgeTextures(rules.SmudgeTypes);
                 ReadAnimTextures(rules.AnimTypes, rules.BuildingTypes);
                 ReadAlphaImages(rules);
+                ReadMiscTextures();
             }
 
             CombineSpriteSheets();
@@ -494,7 +517,7 @@ namespace TSMapEditor.Rendering
                     // Copy data from sprite sheet to our buffer
                     for (int sy = 0; sy < spriteSheetObject.Height; sy++)
                     {
-                        Buffer.BlockCopy(spriteSheetObject.WorkingBuffer, sy * RenderingConstants.MaximumDX11TextureSize, hugeBuffer, (y + sy) * RenderingConstants.MaximumDX11TextureSize, spriteSheetObject.Width);
+                        Buffer.BlockCopy(spriteSheetObject.WorkingBuffer, sy * spriteSheetObject.WorkingBufferWidth, hugeBuffer, (y + sy) * RenderingConstants.MaximumDX11TextureSize, spriteSheetObject.Width);
                     }
 
                     x = Math.Max(x, spriteSheetObject.Width);
@@ -556,7 +579,7 @@ namespace TSMapEditor.Rendering
 
                 for (int i = 0; i < tileSet.TilesInSet; i++)
                 {
-                    var tileGraphics = new List<TileImage>();
+                    var tileGraphics = new List<MGTileImage>();
 
                     // Handle graphics variation (clear00.tem, clear00a.tem, clear00b.tem etc.)
                     for (int v = 0; v < 'g' - 'a'; v++)
@@ -584,7 +607,7 @@ namespace TSMapEditor.Rendering
                         {
                             if (v == 0)
                             {
-                                tileGraphics.Add(new TileImage(0, 0, tsId, i, currentTileIndex, Array.Empty<MGTMPImage>()));
+                                tileGraphics.Add(new MGTileImage(0, 0, tsId, i, currentTileIndex, Array.Empty<MGSubTileImage>()));
                                 break;
                             }
                             else
@@ -597,7 +620,7 @@ namespace TSMapEditor.Rendering
                         tmpFile.ParseFromBuffer(data);
 
                         // Gather individual sub-tiles for this variation of the full tile
-                        var tmpImages = new List<MGTMPImage>();
+                        var tmpImages = new List<MGSubTileImage>();
                         for (int img = 0; img < tmpFile.ImageCount; img++)
                         {
                             var tmpImage = tmpFile.GetImage(img);
@@ -608,12 +631,12 @@ namespace TSMapEditor.Rendering
                                 continue;
                             }
 
-                            var monoGameTmpImage = new MGTMPImage(tmpImage, graphicsPreparationObject, TheaterPalette, tsId);
+                            var monoGameTmpImage = new MGSubTileImage(tmpImage, graphicsPreparationObject, TheaterPalette, tsId);
                             tmpImages.Add(monoGameTmpImage);
                         }
 
                         // Add this variation to list of variations for this tile
-                        tileGraphics.Add(new TileImage(tmpFile.CellsX, tmpFile.CellsY, tsId, i, currentTileIndex, tmpImages.ToArray()));
+                        tileGraphics.Add(new MGTileImage(tmpFile.CellsX, tmpFile.CellsY, tsId, i, currentTileIndex, tmpImages.ToArray()));
                     }
 
                     tileSet.LoadedTileCount++;
@@ -631,7 +654,7 @@ namespace TSMapEditor.Rendering
             // Afterwards, we are done!
             graphicsPreparationObject.PostProcessAction = (obj, ssobj) => 
             {
-                var mgTmpImage = (MGTMPImage)obj;
+                var mgTmpImage = (MGSubTileImage)obj;
                 mgTmpImage.Texture = ssobj.Texture;
 
                 mgTmpImage.SourceRectangle = mgTmpImage.SourceRectangle with { Y = mgTmpImage.SourceRectangle.Y + ssobj.YOffset };
@@ -1530,6 +1553,45 @@ namespace TSMapEditor.Rendering
             Logger.Log("Finished loading smudge textures.");
         }
 
+        private ShapeImage LoadShape(string name, XNAPalette palette, GraphicsPreparationClass graphicsPreparationObject)
+        {
+            byte[] data = fileManager.LoadFile("PIPS.SHP");
+            if (data != null)
+            {
+                var shpFile = new ShpFile(name);
+                shpFile.ParseFromBuffer(data);
+                return new ShapeImage(graphicsDevice, shpFile, data, palette, false, false, graphicsPreparationObject);
+            }
+
+            return null;
+        }
+
+        public void ReadMiscTextures()
+        {
+            Logger.Log("Loading miscellaneous textures.");
+
+            var graphicsPreparationObject = new GraphicsPreparationClass(100, 100);
+
+            PipTextures = LoadShape("PIPS.SHP", palettePalette, graphicsPreparationObject);
+
+            lock (graphicsPreparationObjectLocker)
+                graphicsPreparationObjects.Add(graphicsPreparationObject);
+
+            graphicsPreparationObject.PostProcessAction = PostProcessPositionedTexture;
+        }
+
+        public static int GetVeterancyFrame(int veteranLevel)
+        {
+            return (Constants.IsRA2YR, veteranLevel) switch
+            {
+                (true, >= 200) => 15,
+                (true, >= 100) => 14,
+                (false, >= 200) => 8,
+                (false, >= 100) => 7,
+                _ => -1,
+            };
+        }
+
         public void ApplyLightingToPalettes(MapColor lighting)
         {
             palettes.ForEach(p => p.ApplyLighting(lighting));
@@ -1613,6 +1675,9 @@ namespace TSMapEditor.Rendering
 
             AlphaImages = null;
 
+            PipTextures?.Dispose();
+            PipTextures = null;
+
             palettes.ForEach(p => p.Dispose());
             alphaPalette.Dispose();
             palettes.Clear();
@@ -1689,7 +1754,7 @@ namespace TSMapEditor.Rendering
 
         public int GetTileSetId(int uniqueTileIndex)
         {
-            return GetTileGraphics(uniqueTileIndex).TileSetId;
+            return GetTileImage(uniqueTileIndex).TileSetId;
         }
     }
 }

@@ -2,7 +2,6 @@
 using Rampastring.Tools;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -10,13 +9,13 @@ using TSMapEditor.GameMath;
 
 namespace TSMapEditor.Models
 {
-    public enum CliffSide
+    public enum ConnectedTileSide
     {
         Front,
         Back
     }
 
-    public readonly struct CliffConnectionPoint
+    public readonly struct TileConnectionPoint
     {
         /// <summary>
         /// Index of the connection point, 0 or 1
@@ -52,19 +51,14 @@ namespace TSMapEditor.Models
         /// <summary>
         /// Whether the connection point faces "backwards" or "forwards"
         /// </summary>
-        public CliffSide Side { get; init; }
-
-        /// <summary>
-        /// Whether Forbidden Tiles associated with this connection point are ignored for the Tile Display Filter
-        /// </summary>
-        public bool IgnoreForbiddenTilesInTileDisplayFilter { get; init; }
+        public ConnectedTileSide Side { get; init; }
     }
 
-    public class CliffAStarNode
+    public class ConnectedTileAStarNode
     {
-        private CliffAStarNode() {}
+        private ConnectedTileAStarNode() {}
 
-        public CliffAStarNode(CliffAStarNode parent, CliffConnectionPoint exit, Point2D location, CliffTile tile)
+        public ConnectedTileAStarNode(ConnectedTileAStarNode parent, TileConnectionPoint exit, Point2D location, ConnectedTile tile)
         {
             Location = location;
             Tile = tile;
@@ -72,9 +66,13 @@ namespace TSMapEditor.Models
             Parent = parent;
             Exit = exit;
             Destination = Parent.Destination;
+            GScore = Parent.GScore + Vector2.Distance(Parent.ExitCoords.ToXNAVector(), ExitCoords.ToXNAVector());
 
             OccupiedCells = new HashSet<Point2D>(parent.OccupiedCells);
-            OccupiedCells.UnionWith(tile.Foundation.Select(coordinate => coordinate + Location));
+            foreach (var foundationCell in tile.Foundation)
+            {
+                OccupiedCells.Add(foundationCell + Location);
+            }
         }
 
         /// <summary>
@@ -90,7 +88,7 @@ namespace TSMapEditor.Models
         /// <summary>
         /// Tile data
         /// </summary>
-        public CliffTile Tile;
+        public ConnectedTile Tile;
 
         ///// A* Stuff
 
@@ -102,12 +100,12 @@ namespace TSMapEditor.Models
         /// <summary>
         /// Where this node connects to the next node
         /// </summary>
-        public CliffConnectionPoint Exit;
+        public TileConnectionPoint Exit;
 
         /// <summary>
         /// Distance from starting node
         /// </summary>
-        public float GScore => Parent == null ? 0 : Parent.GScore + Vector2.Distance(Parent.ExitCoords.ToXNAVector(), ExitCoords.ToXNAVector());
+        public float GScore { get; private set; }
 
         /// <summary>
         /// Distance to end node
@@ -118,16 +116,16 @@ namespace TSMapEditor.Models
         /// <summary>
         /// Previous node
         /// </summary>
-        public CliffAStarNode Parent;
+        public ConnectedTileAStarNode Parent;
 
         /// <summary>
         /// Accumulated set of all cell coordinates occupied up to this node
         /// </summary>
         public HashSet<Point2D> OccupiedCells = new HashSet<Point2D>();
 
-        public static CliffAStarNode MakeStartNode(Point2D location, Point2D destination, CliffSide startingSide)
+        public static ConnectedTileAStarNode MakeStartNode(Point2D location, Point2D destination, ConnectedTileSide startingSide)
         {
-            CliffConnectionPoint connectionPoint = new CliffConnectionPoint
+            TileConnectionPoint connectionPoint = new TileConnectionPoint
             {
                 Index = 0,
                 ConnectionMask = 0b11111111,
@@ -137,24 +135,25 @@ namespace TSMapEditor.Models
                 ForbiddenTiles = Array.Empty<int>()
             };
 
-            var startNode = new CliffAStarNode()
+            var startNode = new ConnectedTileAStarNode()
             {
                 Location = location,
                 Tile = null,
 
                 Parent = null,
                 Exit = connectionPoint,
-                Destination = destination
+                Destination = destination,
+                GScore = 0
             };
 
             return startNode;
         }
 
-        public List<CliffAStarNode> GetNextNodes(CliffTile tile)
+        public List<ConnectedTileAStarNode> GetNextNodes(ConnectedTile tile)
         {
-            List<(CliffConnectionPoint, List<Direction>)> possibleNeighbors = new();
+            var neighbors = new List<ConnectedTileAStarNode>();
 
-            foreach (CliffConnectionPoint cp in tile.ConnectionPoints)
+            foreach (TileConnectionPoint cp in tile.ConnectionPoints)
             {
                 if (Tile != null)
                 {
@@ -167,41 +166,40 @@ namespace TSMapEditor.Models
                 if (possibleDirections.Count == 0)
                     continue;
 
-                possibleNeighbors.Add((cp, possibleDirections));
-            }
-
-            var neighbors = new List<CliffAStarNode>();
-            
-            foreach (var (connectionPoint, directions) in possibleNeighbors)
-            {
-                if (connectionPoint.Side != Exit.Side)
+                if (cp.Side != Exit.Side)
                     continue;
 
-                foreach (Direction dir in directions)
+                foreach (Direction dir in possibleDirections)
                 {
-                    Point2D placementOffset = Helpers.VisualDirectionToPoint(dir) - connectionPoint.CoordinateOffset;
+                    Point2D placementOffset = Helpers.VisualDirectionToPoint(dir) - cp.CoordinateOffset;
                     Point2D placementCoords = ExitCoords + placementOffset;
 
-                    var exit = tile.GetExit(connectionPoint.Index);
-                    var newNode = new CliffAStarNode(this, exit, placementCoords, tile);
+                    bool overlaps = false;
+                    foreach (var foundationCell in tile.Foundation)
+                    {
+                        if (OccupiedCells.Contains(foundationCell + placementCoords))
+                        {
+                            overlaps = true;
+                            break;
+                        }
+                    }
 
-                    // Make sure that the new node doesn't overlap anything
-                    if (newNode.OccupiedCells.Count - OccupiedCells.Count == newNode.Tile.Foundation.Count)
-                        neighbors.Add(newNode);
+                    if (overlaps)
+                        continue;
+
+                    var exit = tile.GetExit(cp.Index);
+                    neighbors.Add(new ConnectedTileAStarNode(this, exit, placementCoords, tile));
                 }
             }
             
             return neighbors;
         }
 
-        public List<CliffAStarNode> GetNextNodes(List<CliffTile> tiles, bool allowTurn)
+        public List<ConnectedTileAStarNode> GetNextNodes(List<ConnectedTile> tiles, bool allowTurn)
         {
-            List <CliffAStarNode > nextNodes = new List<CliffAStarNode>();
+            List <ConnectedTileAStarNode > nextNodes = new List<ConnectedTileAStarNode>();
             foreach (var tile in tiles)
             {
-                if (tile.ExcludeFromConnectedTileTool)
-                    continue;
-
                 if (!allowTurn && tile.ConnectionPoints[0].Side != tile.ConnectionPoints[1].Side)
                     continue;
 
@@ -212,9 +210,9 @@ namespace TSMapEditor.Models
         }
     }
 
-    public class CliffTile
+    public class ConnectedTile
     {
-        public CliffTile(IniSection iniSection, int index)
+        public ConnectedTile(IniSection iniSection, int index)
         {
             Index = index;
 
@@ -231,45 +229,14 @@ namespace TSMapEditor.Models
 
             IndicesInTileSet = indicesString.Split(',').Select(s => int.Parse(s, CultureInfo.InvariantCulture)).ToList();
 
-            ExcludeFromConnectedTileTool = iniSection.GetBooleanValue("ExcludeFromConnectedTileTool", false);
-            AllowRepeatingSelfInTileDisplayFilter = iniSection.GetBooleanValue("AllowRepeatingSelfInTileDisplayFilter", true);            
-
-            ConnectionPoints = new CliffConnectionPoint[4];
-            int actualConnectionPoints = 0;
+            ConnectionPoints = new TileConnectionPoint[2];
 
             for (int i = 0; i < ConnectionPoints.Length; i++)
             {
                 string coordsString = iniSection.GetStringValue($"ConnectionPoint{i}", null);
-                
-                if (coordsString == null)
-                {      
-                    // All tiles must have at least 1 CP
-                    if (i == 0)
-                    {
-                        throw new INIConfigException($"ConnectedTile {iniSection.SectionName} has no connection points defined.");
-                    }                    
-                    // A tile is only allowed to have 1 CP if it's not being used by the Draw Connected Tiles tool
-                    else if (i == 1 && !ExcludeFromConnectedTileTool)
-                    {
-                        throw new INIConfigException($"ConnectedTile {iniSection.SectionName} is not excluded from the Draw Connected Tiles tool and only has 1 connection point defined.");
-                    } 
-                    // All tiles can omit beyond 2 CPs - they will be skipped and ignored.
-                    else
-                    {
-                        continue;
-                    }
-                }
-                else
-                {
-                    // A tile cannot have more than 2 CPs if it's not excluded from the Draw Connected Tiles tool
-                    if (i > 1 && !ExcludeFromConnectedTileTool)
-                        throw new INIConfigException($"ConnectedTile {iniSection.SectionName} has at least {i + 1} connection points, but is not excluded from the Draw Connected Tiles tool. Either exclude it or reduce connection points to 2.");
+                if (coordsString == null || !Regex.IsMatch(coordsString, "^\\d+?,\\d+?$"))
+                    throw new INIConfigException($"Connected Tile {iniSection.SectionName} has invalid ConnectionPoint{i} value: {coordsString}!");
 
-                    if (!Regex.IsMatch(coordsString, "^\\d+?,\\d+?$"))
-                        throw new INIConfigException($"Connected Tile {iniSection.SectionName} has invalid ConnectionPoint{i} value: {coordsString}!");
-                }
-
-                actualConnectionPoints++;
                 Point2D coords = Point2D.FromString(coordsString);
 
                 string directionsString = iniSection.GetStringValue($"ConnectionPoint{i}.Directions", null);
@@ -297,15 +264,15 @@ namespace TSMapEditor.Models
                 }
 
                 string sideString = iniSection.GetStringValue($"ConnectionPoint{i}.Side", string.Empty);
-                CliffSide side = sideString.ToLower() switch
+                ConnectedTileSide side = sideString.ToLower() switch
                 {
-                    "front" => CliffSide.Front,
-                    "back" => CliffSide.Back,
-                    "" => CliffSide.Front,
+                    "front" => ConnectedTileSide.Front,
+                    "back" => ConnectedTileSide.Back,
+                    "" => ConnectedTileSide.Front,
                     _ => throw new INIConfigException($"Connected Tile {iniSection.SectionName} has an invalid ConnectionPoint{i}.Side value: {sideString}!")
                 };
 
-                int[] requiredTiles, forbiddenTiles;                
+                int[] requiredTiles, forbiddenTiles;
 
                 var requiredTilesList =
                     iniSection.GetListValue($"ConnectionPoint{i}.RequiredTiles", ',', int.Parse);
@@ -324,21 +291,16 @@ namespace TSMapEditor.Models
                     requiredTiles = Array.Empty<int>();
                 }
 
-                bool ignoreForbiddenTilesInTileDisplayFilter = iniSection.GetBooleanValue($"ConnectionPoint{i}.IgnoreForbiddenTilesInTileDisplayFilter", false);
-
-                ConnectionPoints[i] = new CliffConnectionPoint
+                ConnectionPoints[i] = new TileConnectionPoint
                 {
                     Index = i,
                     ConnectionMask = directions,
                     CoordinateOffset = coords,
                     Side = side,
                     RequiredTiles = requiredTiles,
-                    ForbiddenTiles = forbiddenTiles,
-                    IgnoreForbiddenTilesInTileDisplayFilter = ignoreForbiddenTilesInTileDisplayFilter,
+                    ForbiddenTiles = forbiddenTiles
                 };
             }
-
-            IsEnding = actualConnectionPoints == 1;
 
             if (iniSection.KeyExists("Foundation"))
             {
@@ -350,7 +312,7 @@ namespace TSMapEditor.Models
             }
 
             ExtraPriority = -iniSection.GetIntValue("ExtraPriority", IsStraight(ConnectionPoints) ? -1 : 0); // negated because sorting is in ascending order by default, but it's more intuitive to have larger numbers be more important
-            DistanceModifier = iniSection.GetIntValue("DistanceModifier", IsDiagonal(ConnectionPoints) ? -3 : 0);            
+            DistanceModifier = iniSection.GetIntValue("DistanceModifier", IsDiagonal(ConnectionPoints) ? -3 : 0);
         }
 
         /// <summary>
@@ -371,7 +333,7 @@ namespace TSMapEditor.Models
         /// <summary>
         /// Places this tile connects to other tiles
         /// </summary>
-        public CliffConnectionPoint[] ConnectionPoints { get; set; }
+        public TileConnectionPoint[] ConnectionPoints { get; set; }
 
         /// <summary>
         /// Set of all relative cell coordinates this tile occupies
@@ -388,35 +350,18 @@ namespace TSMapEditor.Models
         /// </summary>
         public int DistanceModifier { get; set; }
 
-        /// <summary>
-        /// When true, this tile is disallowed from being used in the Draw Connected Tile tool
-        /// </summary>
-        public bool ExcludeFromConnectedTileTool { get; init; }
-
-        /// <summary>
-        /// If enabled, tiles that are forbidden from referencing themselves are allowed by the Tile Display Filter.
-        /// This is useful if the tile can still connect to itself, but we don't want the Draw Connected Tiles tool to do so to prevent repeatitiveness.
-        /// </summary>
-        public bool AllowRepeatingSelfInTileDisplayFilter { get; init; }
-
-        /// <summary>
-        /// Determines whether this tile is an ending, denoted by it only having one connection point.
-        /// An ending tile is always excluded from the Draw Connected Tiles tool.
-        /// </summary>
-        public bool IsEnding { get; init; }
-
-        public CliffConnectionPoint GetExit(int entryIndex)
+        public TileConnectionPoint GetExit(int entryIndex)
         {
             return ConnectionPoints[0].Index == entryIndex ? ConnectionPoints[1] : ConnectionPoints[0];
         }
 
-        private bool IsStraight(CliffConnectionPoint[] connectionPoints)
+        private bool IsStraight(TileConnectionPoint[] connectionPoints)
         {
             int mask = connectionPoints[0].ConnectionMask & connectionPoints[1].ReversedConnectionMask;
             return mask > 0;
         }
 
-        private bool IsDiagonal(CliffConnectionPoint[] connectionPoints)
+        private bool IsDiagonal(TileConnectionPoint[] connectionPoints)
         {
             var directions = Helpers.GetDirectionsInMask((byte)(connectionPoints[0].ConnectionMask &
                                                                 connectionPoints[1].ReversedConnectionMask));
@@ -468,9 +413,9 @@ namespace TSMapEditor.Models
         }
     }
 
-    public class CliffType
+    public class ConnectedTileType
     {
-        public static CliffType FromIniSection(IniFile iniFile, string sectionName)
+        public static ConnectedTileType FromIniSection(IniFile iniFile, string sectionName)
         {
             IniSection cliffSection = iniFile.GetSection(sectionName);
             if (cliffSection == null)
@@ -489,10 +434,10 @@ namespace TSMapEditor.Models
             if (cliffSection.KeyExists("Color"))
                 color = cliffSection.GetColorValue("Color", Microsoft.Xna.Framework.Color.White);
 
-            return new CliffType(iniFile, sectionName, cliffName, frontOnly, allowedTheaters, color);
+            return new ConnectedTileType(iniFile, sectionName, cliffName, frontOnly, allowedTheaters, color);
         }
 
-        private CliffType(IniFile iniFile, string iniName, string name, bool frontOnly, List<string> allowedTheaters, Color? color)
+        private ConnectedTileType(IniFile iniFile, string iniName, string name, bool frontOnly, List<string> allowedTheaters, Color? color)
         {
             IniName = iniName;
             Name = Translate(this, iniName, name);
@@ -500,7 +445,7 @@ namespace TSMapEditor.Models
             FrontOnly = frontOnly;
             Color = color;
 
-            Tiles = new List<CliffTile>();
+            Tiles = new List<ConnectedTile>();
 
             foreach (var sectionName in iniFile.GetSections())
             {
@@ -514,7 +459,7 @@ namespace TSMapEditor.Models
                         $"Connected Tile {iniName} has multiple tiles with the same index {index}!");
                 }
 
-                Tiles.Add(new CliffTile(iniFile.GetSection(sectionName), index));
+                Tiles.Add(new ConnectedTile(iniFile.GetSection(sectionName), index));
             }
         }
 
@@ -524,6 +469,6 @@ namespace TSMapEditor.Models
         public bool IsLegal { get; set; } = true;
         public Color? Color { get; set; }
         public List<string> AllowedTheaters { get; set; }
-        public List<CliffTile> Tiles { get; }
+        public List<ConnectedTile> Tiles { get; }
     }
 }

@@ -1,4 +1,3 @@
-﻿using FuzzySharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Rampastring.Tools;
@@ -9,12 +8,12 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using TSMapEditor.CCEngine;
+using TSMapEditor.CCEngine.TileData;
 using TSMapEditor.Extensions;
 using TSMapEditor.GameMath;
 using TSMapEditor.Misc;
 using TSMapEditor.Models;
 using TSMapEditor.Models.Enums;
-using TSMapEditor.Rendering;
 
 namespace TSMapEditor
 {
@@ -284,11 +283,6 @@ namespace TSMapEditor
             }
 
             return directions;
-        }
-
-        public static bool IsReverseDirection(Direction direction, Direction otherDirection)
-        {
-            return ((int)direction + 4) % 8 == (int)otherDirection;
         }
 
         /// <summary>
@@ -583,12 +577,12 @@ namespace TSMapEditor
         /// </summary>
         /// <param name="targetTile">Target map tile.</param>
         /// <param name="map">Map instance.</param>
-        /// <param name="theaterGraphics">Theater graphics instance.</param>
+        /// <param name="theaterTileData">Theater tile data instance.</param>
         /// <returns>Collection of map tile coordinates.</returns>
-        public static IEnumerable<Point2D> GetFillAreaTiles(MapTile targetTile, Map map, TheaterGraphics theaterGraphics)
+        public static IEnumerable<Point2D> GetFillAreaTiles(MapTile targetTile, Map map, ITheaterTileData theaterTileData)
         {
-            TileImage tileGraphics = theaterGraphics.GetTileGraphics(targetTile.TileIndex);
-            MGTMPImage subCellImage = tileGraphics.TMPImages[targetTile.SubTileIndex];
+            TileImage tileGraphics = theaterTileData.GetTileImage(targetTile.TileIndex);
+            ISubTileImage subCellImage = tileGraphics.GetSubTile(targetTile.SubTileIndex);
 
             byte terrainType = subCellImage.TmpImage.TerrainType;
             int tileSetId = tileGraphics.TileSetId;
@@ -624,14 +618,14 @@ namespace TSMapEditor
                     continue;
                 }
 
-                tileGraphics = theaterGraphics.GetTileGraphics(cell.TileIndex);
+                tileGraphics = theaterTileData.GetTileImage(cell.TileIndex);
                 if (tileGraphics.TileSetId != tileSetId)
                 {
                     tilesToSkip.Add(coords.GetHashCode());
                     continue;
                 }
 
-                subCellImage = tileGraphics.TMPImages[cell.SubTileIndex];
+                subCellImage = tileGraphics.GetSubTile(cell.SubTileIndex);
                 if (subCellImage.TmpImage.TerrainType != terrainType)
                 {
                     tilesToSkip.Add(coords.GetHashCode());
@@ -826,114 +820,40 @@ namespace TSMapEditor
             return iniFile;
         }
 
-		public static IniFileEx ReadConfigINIEx(string path, CCFileManager fileManager)
-		{
-			string customPath = Path.Combine(Environment.CurrentDirectory, "Config", path);
-			string defaultPath = Path.Combine(Environment.CurrentDirectory, "Config", "Default", path);
-
-			if (File.Exists(customPath))
-				return new IniFileEx(customPath, fileManager);
-
-			return new IniFileEx(defaultPath, fileManager);
-		}
-		
-        /// <summary>
-		/// Calculates a fuzzy search score between a search string and a target string.
-		/// The score is based on similarity and optionally checks individual parts of the target string.
-		/// Significantly improves score of exact matches and partial matches of the search string.
-		/// </summary>
-		/// <param name="searchString">The string to search for.</param>
-		/// <param name="targetString">The string to compare against.</param>
-		/// <param name="checkParts">Whether to check multiple parts separated by a space. Useful for texts that has ININame or ID, followed by the object name.</param>
-		/// <returns>An integer score representing the similarity between the strings.</returns>
-		public static int CalculateFuzzySearchScore(string searchString, string targetString, bool checkParts)
-		{
-			targetString = targetString.ToLowerInvariant();
-
-			if (string.IsNullOrWhiteSpace(searchString))
-				return 100;
-
-			// Fuzzy Search method, used to calculate initial score
-			int score = Fuzz.Ratio(searchString, targetString);
-
-			List<string> nameParts = [];
-
-			if (checkParts)
-			{
-				int spaceIndex = targetString.IndexOf(" ");
-				if (spaceIndex >= 0)
-				{
-					string firstPart = targetString.Substring(0, spaceIndex);
-					string secondPart = targetString.Substring(spaceIndex + 1);
-					nameParts.Add(firstPart);
-					nameParts.Add(secondPart);
-				}
-				else
-				{
-					nameParts.Add(targetString);
-				}
-			}
-			else
-			{
-				nameParts.Add(targetString);
-			}
-
-			foreach (var namePart in nameParts)
-			{
-				if (namePart == searchString)
-				{
-					score += 100;
-					break;
-				}
-				else if (namePart.StartsWith(searchString))
-				{
-					score += 75;
-					break;
-				}
-				else if (namePart.Contains(searchString))
-				{
-					score += 35;
-					break;
-				}
-			}
-
-			return score;
-		}
-
-        /// <summary>
-        /// Performs a fuzzy search on a list of items and returns a list of results with their scores.
-        /// Items are filtered by a minimum score and optionally checked for partial matches.
-        /// </summary>
-        /// <typeparam name="T">The type of items in the list.</typeparam>
-        /// <param name="searchString">The string to search for.</param>
-        /// <param name="itemsList">The list of items to search through.</param>
-        /// <param name="extractTextFromItem">A function to extract the name or relevant representation of an item.</param>
-        /// <param name="minimumScore">The minimum score required for an item to be included in the results.</param>
-        /// <param name="checkParts">Whether to check multiple parts separated by a space. Useful for texts that has ININame or ID, followed by the object name.</param>
-        /// <returns>A list of fuzzy search results, each containing an item and a score.
-        public static List<FuzzySearchItem<T>> FuzzySearch<T>(string searchString, List<T> itemsList, Func<T, string> extractTextFromItem, int minimumScore, bool checkParts)
+        public static IniFileEx ReadConfigINIEx(string path, CCFileManager fileManager)
         {
-            searchString = searchString.ToLowerInvariant();
+            string customPath = Path.Combine(Environment.CurrentDirectory, "Config", path);
+            string defaultPath = Path.Combine(Environment.CurrentDirectory, "Config", "Default", path);
 
+            if (File.Exists(customPath))
+                return new IniFileEx(customPath, fileManager);
+
+            return new IniFileEx(defaultPath, fileManager);
+        }
+
+        /// <summary>Scores and orders matches for the fork's list filtering UI.</summary>
+        public static List<FuzzySearchItem<T>> FuzzySearch<T>(string searchString, List<T> items,
+            Func<T, string> getText, int minimumScore, bool checkParts)
+        {
             if (string.IsNullOrWhiteSpace(searchString))
-                return itemsList.Select(item => new FuzzySearchItem<T>(item, 100)).ToList();
+                return items.Select(item => new FuzzySearchItem<T>(item, 100)).ToList();
 
-            var results = itemsList
-                .Select(item =>
-                {
-                    string itemText = extractTextFromItem(item);
+            string query = searchString.ToLowerInvariant();
+            return items.Select(item => new FuzzySearchItem<T>(item, CalculateFuzzySearchScore(query, getText(item), checkParts)))
+                .Where(item => item.Score >= minimumScore).OrderByDescending(item => item.Score).ToList();
+        }
 
-                    if (itemText == Constants.NoneValue1 || itemText == Constants.NoneValue2)
-                        return new FuzzySearchItem<T>(item, 0);
+        public static int CalculateFuzzySearchScore(string searchString, string targetString, bool checkParts)
+        {
+            string target = targetString?.ToLowerInvariant() ?? string.Empty;
+            if (target == searchString)
+                return 200;
+            if (target.StartsWith(searchString))
+                return 175;
+            if (target.Contains(searchString))
+                return 135;
 
-                    int score = CalculateFuzzySearchScore(searchString, itemText, checkParts);
-                    return new FuzzySearchItem<T>(item, score);
-                })
-                .Where(item => item.Score >= minimumScore)
-                .OrderByDescending(item => item.Score)
-                .ToList();
-
-            return results;
+            return checkParts && target.Split(' ').Any(part => part.StartsWith(searchString)) ? 100 : 0;
         }
 
         public static string DifficultyToTranslatedString(Difficulty difficulty)
@@ -963,7 +883,7 @@ namespace TSMapEditor
         public static string GetNameForClone(string name)
         {
             string[] parts = name.Split(" ");
-            int numPart = -1;
+            int numPart = -1;            
 
             for (int i = 0; i < parts.Length; i++)
             {                

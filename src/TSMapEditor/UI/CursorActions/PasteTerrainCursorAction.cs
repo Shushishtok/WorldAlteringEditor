@@ -41,14 +41,6 @@ namespace TSMapEditor.UI.CursorActions
             }
         }
 
-        struct OriginalSmudgeInfo
-        {
-            public Point2D CellCoords;
-            public SmudgeType SmudgeType;
-
-
-        }
-
 
         private CopiedMapData copiedMapData;
 
@@ -149,7 +141,7 @@ namespace TSMapEditor.UI.CursorActions
                 foundationHashSet.Add(entry.Offset);
             });
 
-            edges = Helpers.CreateEdges(copiedMapData.Width + 2, copiedMapData.Height + 2, foundationHashSet.ToList());
+            edges = Helpers.CreateEdges(copiedMapData.Width + 1, copiedMapData.Height + 1, foundationHashSet.ToList());
         }
 
         public override void PreMapDraw(Point2D cellCoords)
@@ -181,9 +173,12 @@ namespace TSMapEditor.UI.CursorActions
                 if (entry.EntryType == CopiedEntryType.Terrain)
                 {
                     var terrainEntry = entry as CopiedTerrainEntry;
-                    cell.PreviewTileImage = CursorActionTarget.TheaterGraphics.GetTileGraphics(terrainEntry.TileIndex, 0);
-                    cell.PreviewSubTileIndex = terrainEntry.SubTileIndex;
-                    cell.PreviewLevel = Math.Max(0, Math.Min(Constants.MaxMapHeightLevel, originLevel + terrainEntry.HeightOffset + originLevelOffset));
+
+                    var previewTileImage = CursorActionTarget.TheaterGraphics.GetTileGraphics(terrainEntry.TileIndex, 0);
+                    int previewSubTileIndex = terrainEntry.SubTileIndex;
+                    int previewLevel = Math.Max(0, Math.Min(Constants.MaxMapHeightLevel, originLevel + terrainEntry.HeightOffset + originLevelOffset));
+
+                    cell.ApplyPreview(previewTileImage, previewSubTileIndex, previewLevel, Map.Lighting, CursorActionTarget.LightingPreviewState, MutationTarget.LightDisabledLightSources);
                 }
                 else if (entry.EntryType == CopiedEntryType.Overlay)
                 {
@@ -243,7 +238,7 @@ namespace TSMapEditor.UI.CursorActions
                 if (cell == null)
                     continue;
 
-                cell.PreviewTileImage = null;
+                cell.ClearPreview(Map.Lighting, CursorActionTarget.LightingPreviewState, MutationTarget.LightDisabledLightSources);
             }
 
             foreach (var originalOverlayEntry in originalOverlay)
@@ -264,6 +259,23 @@ namespace TSMapEditor.UI.CursorActions
             CursorActionTarget.AddRefreshPoint(cellCoords, maxOffset);
         }
 
+        private Point2D GetEdgeCoordsCompensated(Point2D originalEdgeCoords)
+        {
+            // Edges partially run outside of the foundation of the copied cell. For example, a 1x1 copied area has a 2x2 edge foundation.
+            // Compensate for that here.
+
+            int x = originalEdgeCoords.X;
+            int y = originalEdgeCoords.Y;
+
+            if (x >= copiedMapData.Width)
+                x--;
+
+            if (y >= copiedMapData.Height)
+                y--;
+
+            return new Point2D(x, y);
+        }
+
         public override void DrawPreview(Point2D cellCoords, Point2D cameraTopLeftPoint)
         {
             if (KeyboardCommands.Instance.PlaceTerrainBelow.AreKeysOrModifiersDown(Keyboard))
@@ -280,13 +292,13 @@ namespace TSMapEditor.UI.CursorActions
 
                 if (!CursorActionTarget.Is2DMode)
                 {
-                    var cell = Map.GetTile(edgeCell0);
+                    var cell = Map.GetTile(cellCoords + GetEdgeCoordsCompensated(edge[0]));
                     if (cell != null)
-                        heightOffset0 = Constants.CellHeight * cell.Level;
+                        heightOffset0 = Constants.CellHeight * cell.GetLevelOrPreviewLevel();
 
-                    cell = Map.GetTile(edgeCell1);
+                    cell = Map.GetTile(cellCoords + GetEdgeCoordsCompensated(edge[1]));
                     if (cell != null)
-                        heightOffset1 = Constants.CellHeight * cell.Level;
+                        heightOffset1 = Constants.CellHeight * cell.GetLevelOrPreviewLevel();
                 }
 
                 // Translate edge vertices from cell coordinate space to world coordinate space.

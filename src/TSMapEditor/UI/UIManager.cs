@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework;
+using Rampastring.Tools;
 using Rampastring.XNAUI;
 using Rampastring.XNAUI.XNAControls;
 using System;
@@ -407,6 +408,8 @@ namespace TSMapEditor.UI
 
             if (issues.Count > 0)
             {
+                Logger.Log("List of map issues:" + Environment.NewLine + string.Join(Environment.NewLine, issues));
+
                 if (issues.Count > 10)
                     issues = issues.Take(10).ToList();
 
@@ -474,8 +477,9 @@ namespace TSMapEditor.UI
             mapFileWatcher.StopWatching();
 
             bool createNew = loadMapFilePath == null;
+            var mapSetup = new MapSetup();
 
-            string error = MapSetup.InitializeMap(UserSettings.Instance.GameDirectory, createNew,
+            string error = mapSetup.InitializeMap(UserSettings.Instance.GameDirectory, createNew,
                 loadMapFilePath,
                 createNew ? newMapInfo : null,
                 WindowManager);
@@ -504,7 +508,7 @@ namespace TSMapEditor.UI
             ClearResources();
             WindowManager.RemoveControl(this);
 
-            MapSetup.LoadTheaterGraphics(WindowManager, UserSettings.Instance.GameDirectory);
+            mapSetup.LoadTheaterGraphics(WindowManager);
         }
 
         private void ClearResources()

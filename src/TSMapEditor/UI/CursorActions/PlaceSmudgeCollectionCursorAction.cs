@@ -2,17 +2,22 @@
 using System.Collections.Generic;
 using TSMapEditor.GameMath;
 using TSMapEditor.Models;
+using TSMapEditor.Mutations;
 using TSMapEditor.Mutations.Classes;
 
 namespace TSMapEditor.UI.CursorActions
 {
-    public class PlaceSmudgeCollectionCursorAction : CursorAction
+    public class PlaceSmudgeCollectionCursorAction : LineAndRegularPaintingAction
     {
         public PlaceSmudgeCollectionCursorAction(ICursorActionTarget cursorActionTarget) : base(cursorActionTarget)
         {
         }
 
         public override string GetName() => Translate("Name", "Place Smudge Collection");
+
+        protected override bool CenterCellCoordsOnBrush => true;
+
+        protected override bool ClearPreviousCellOnMouseUp => true;
 
         private SmudgeCollection _smudgeCollection;
         public SmudgeCollection SmudgeCollection
@@ -32,9 +37,21 @@ namespace TSMapEditor.UI.CursorActions
         private List<Smudge> previewSmudges = new List<Smudge>();
         private List<Smudge> existingSmudges = new List<Smudge>();
 
+        public override void OnActionExit()
+        {
+            ClearLinePreview();
+            base.OnActionExit();
+        }
+
         public override void PreMapDraw(Point2D cellCoords)
         {
-            Point2D centeredBrushSizeCellCoords = CursorActionTarget.BrushSize.CenterWithinBrush(cellCoords);
+            if (LineSourceCell.HasValue)
+            {
+                ApplyLinePreview(cellCoords);
+                return;
+            }
+
+            Point2D centeredBrushSizeCellCoords = GetCenteredBrushSizeCellCoords(cellCoords);
             existingSmudges.Clear();
 
             int i = 0;
@@ -69,9 +86,13 @@ namespace TSMapEditor.UI.CursorActions
 
         public override void PostMapDraw(Point2D cellCoords)
         {
-            base.PostMapDraw(cellCoords);
+            if (LineSourceCell.HasValue)
+            {
+                ClearLinePreview();
+                return;
+            }
 
-            Point2D centeredBrushSizeCellCoords = CursorActionTarget.BrushSize.CenterWithinBrush(cellCoords);
+            Point2D centeredBrushSizeCellCoords = GetCenteredBrushSizeCellCoords(cellCoords);
 
             int i = 0;
             CursorActionTarget.BrushSize.DoForBrushSize(offset =>
@@ -87,13 +108,26 @@ namespace TSMapEditor.UI.CursorActions
             CursorActionTarget.AddRefreshPoint(centeredBrushSizeCellCoords, CursorActionTarget.BrushSize.Max);
         }
 
-        public override void LeftDown(Point2D cellCoords)
+        protected override bool CanDrawLinePreview() => _smudgeCollection != null;
+
+        protected override ICheckableMutation CreateRegularPlacementMutation(Point2D cellCoords)
         {
-            Point2D centeredBrushSizeCellCoords = CursorActionTarget.BrushSize.CenterWithinBrush(cellCoords);
-            var mutation = new PlaceSmudgeCollectionMutation(CursorActionTarget.MutationTarget, SmudgeCollection, centeredBrushSizeCellCoords, MutationTarget.BrushSize);
-            CursorActionTarget.MutationManager.PerformMutation(mutation);
+            return new PlaceSmudgeCollectionMutation(CursorActionTarget.MutationTarget, SmudgeCollection, cellCoords, MutationTarget.BrushSize);
         }
 
-        public override void LeftClick(Point2D cellCoords) => LeftDown(cellCoords);
+        protected override Mutation CreateLinePlacementMutation(Direction direction, int length)
+        {
+            return new PlaceSmudgeCollectionLineMutation(MutationTarget, SmudgeCollection, LineSourceCell.Value, direction, length);
+        }
+
+        protected override void ApplyLine(Point2D cellCoords)
+        {
+            if (_smudgeCollection != null)
+            {
+                (Direction direction, int length) = GetLineInformation(cellCoords);
+                var mutation = CreateLinePlacementMutation(direction, length);
+                PerformMutation(mutation);
+            }
+        }
     }
 }

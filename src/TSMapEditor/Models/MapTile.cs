@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using TSMapEditor.GameMath;
@@ -23,15 +23,15 @@ namespace TSMapEditor.Models
         /// The cached image for this tile.
         /// This should be cleared when the tile's terrain is changed.
         /// </summary>
-        public TileImage TileImage { get; set; }
+        public MGTileImage TileImage { get; set; }
         public TerrainObject TerrainObject { get; set; }
         public List<Structure> Structures { get; set; } = new List<Structure>();
         public List<Unit> Vehicles { get; set; } = new List<Unit>();
         public List<Aircraft> Aircraft { get; set; } = new List<Aircraft>();
         public Infantry[] Infantry { get; set; } = new Infantry[SubCellCount];
-        public TileImage PreviewTileImage { get; set; }
-        public int PreviewSubTileIndex { get; set; }
-        public int PreviewLevel { get; set; } = -1;
+        public MGTileImage PreviewTileImage { get; private set; }
+        public int PreviewSubTileIndex { get; private set; }
+        public int PreviewLevel { get; private set; } = -1;
 
         public Overlay Overlay { get; set; }
         public Smudge Smudge { get; set; }
@@ -56,6 +56,35 @@ namespace TSMapEditor.Models
         public MapColor CellLighting { get; set; } = new MapColor(1.0, 1.0, 1.0);
 
         public List<(Structure Source, double DistanceInLeptons)> LightSources { get; set; } = new();
+
+        /// <summary>
+        /// Returns the display height level of this cell.
+        /// If the cell has a valid preview height level defined, returns the preview height level.
+        /// Otherwise returns the actual, non-preview height level.
+        /// </summary>
+        public int GetLevelOrPreviewLevel()
+        {
+            if (PreviewLevel > -1)
+                return PreviewLevel;
+
+            return Level;
+        }
+
+        public void ApplyPreview(MGTileImage previewTileImage, int previewSubTileIndex, int previewLevel, Lighting lighting, LightingPreviewMode lightingPreviewMode, bool lightDisabledLightSources)
+        {
+            PreviewTileImage = previewTileImage;
+            PreviewSubTileIndex = previewSubTileIndex;
+            PreviewLevel = previewLevel;
+            RefreshLighting(lighting, lightingPreviewMode, lightDisabledLightSources);
+        }
+
+        public void ClearPreview(Lighting lighting, LightingPreviewMode lightingPreviewMode, bool lightDisabledLightSources)
+        {
+            PreviewTileImage = null;
+            PreviewSubTileIndex = -1;
+            PreviewLevel = -1;
+            RefreshLighting(lighting, lightingPreviewMode, lightDisabledLightSources);
+        }
 
         public void RefreshLighting(Lighting lighting, LightingPreviewMode lightingPreviewMode, bool lightDisabledLightSources)
         {
@@ -85,7 +114,7 @@ namespace TSMapEditor.Models
             cellAmbient *= (1.0 - globalGround);
 
             // Apply Level
-            cellAmbient += globalLevel * Level;
+            cellAmbient += globalLevel * (PreviewLevel > -1 ? PreviewLevel : Level);
 
             // Check all the light sources and how they affect this light
             foreach (var source in LightSources)
@@ -490,9 +519,9 @@ namespace TSMapEditor.Models
 
         public bool MatchesLandType(LandType landType)
         {
-            if (TileImage == null || TileImage.TMPImages == null) return false;
+            if (TileImage == null) return false;
 
-            var subCellImage = SubTileIndex < TileImage.TMPImages.Length ? TileImage.TMPImages[SubTileIndex] : null;
+            var subCellImage = SubTileIndex < TileImage.SubTileCount ? TileImage.GetSubTile(SubTileIndex) : null;
             var terrainType = subCellImage?.TmpImage?.TerrainType;
             return terrainType == Helpers.LandTypeToInt(landType);
         }

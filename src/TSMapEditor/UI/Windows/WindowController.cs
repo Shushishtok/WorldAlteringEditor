@@ -42,6 +42,7 @@ namespace TSMapEditor.UI.Windows
         public ScriptsWindow ScriptsWindow { get; private set; }
         public TeamTypesWindow TeamTypesWindow { get; private set; }
         public TriggersWindow TriggersWindow { get; private set; }
+        public TagsWindow TagsWindow { get; private set; }
         public AITriggersWindow AITriggersWindow { get; private set; }
         public GeneralSettingsWizardStepWindow GeneralSettingsWizardStepWindow { get; private set; }
         public TaskForceWizardStepWindow TaskForceWizardStepWindow { get; private set; }
@@ -129,6 +130,9 @@ namespace TSMapEditor.UI.Windows
             TriggersWindow = new TriggersWindow(windowParentControl.WindowManager, map, editorState, cursorActionTarget);
             Windows.Add(TriggersWindow);
 
+            TagsWindow = new TagsWindow(windowParentControl.WindowManager, map);
+            Windows.Add(TagsWindow);
+
             AITriggersWindow = new AITriggersWindow(windowParentControl.WindowManager, map);
             Windows.Add(AITriggersWindow);
 
@@ -162,7 +166,7 @@ namespace TSMapEditor.UI.Windows
             InfantryOptionsWindow = new InfantryOptionsWindow(windowParentControl.WindowManager, map, cursorActionTarget);
             Windows.Add(InfantryOptionsWindow);
 
-            AircraftOptionsWindow = new AircraftOptionsWindow(windowParentControl.WindowManager, map);
+            AircraftOptionsWindow = new AircraftOptionsWindow(windowParentControl.WindowManager, map, cursorActionTarget);
             Windows.Add(AircraftOptionsWindow);
 
             HousesWindow = new HousesWindow(windowParentControl.WindowManager, map);
@@ -281,7 +285,7 @@ namespace TSMapEditor.UI.Windows
         {
             if (e.Tag.Trigger == null)
             {
-                EditorMessageBox.Show(windowParentControl.WindowManager, 
+                EditorMessageBox.Show(windowParentControl.WindowManager,
                     Translate(this, "NoTriggerAttached.Title", "No trigger attached"),
                     Translate(this, "NoTriggerAttached.Description", "The specified Tag has no attached Trigger!"),
                     MessageBoxButtons.OK);
@@ -413,6 +417,7 @@ namespace TSMapEditor.UI.Windows
                 window.InteractedWith -= Window_HandleFocusSwitch;
                 RemoveFocusSwitchHandlerFromChildrenRecursive(window, window);
                 window.Kill();
+                windowParentControl.RemoveChild(window);
             }
         }
 

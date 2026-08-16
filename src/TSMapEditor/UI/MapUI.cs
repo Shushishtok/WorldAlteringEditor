@@ -353,10 +353,21 @@ namespace TSMapEditor.UI
         {
             inputEventArgs.Handled = true;
 
-            if (Cursor.ScrollWheelValue > 0)
-                Camera.ZoomLevel += ZoomStep;
+            if (Keyboard.IsAltHeldDown())
+            {
+                int brushSizeIndex = Map.EditorConfig.BrushSizes.IndexOf(EditorState.BrushSize);
+                if (Cursor.ScrollWheelValue < 0 && brushSizeIndex < Map.EditorConfig.BrushSizes.Count - 1)
+                    EditorState.BrushSize = Map.EditorConfig.BrushSizes[brushSizeIndex + 1];
+                else if (Cursor.ScrollWheelValue > 0 && brushSizeIndex > 0)
+                    EditorState.BrushSize = Map.EditorConfig.BrushSizes[brushSizeIndex - 1];
+            }
             else
-                Camera.ZoomLevel -= ZoomStep;
+            {
+                if (Cursor.ScrollWheelValue > 0)
+                    Camera.ZoomLevel += ZoomStep;
+                else
+                    Camera.ZoomLevel -= ZoomStep;
+            }
 
             base.OnMouseScrolled(inputEventArgs);
         }
@@ -476,18 +487,18 @@ namespace TSMapEditor.UI
             {
                 if (Cursor.LeftDown)
                 {
-                    if (leftPressedDownOnControl && tileUnderCursor != null)
+                    if (leftPressedDownOnControl && tileUnderCursor != null && CursorAction.OnlyUniqueCellEvents)
                     {
-                        if (lastTileUnderCursor != tileUnderCursor || !CursorAction.OnlyUniqueCellEvents)
+                        if (lastTileUnderCursor != tileUnderCursor)
                             CursorAction.LeftDown(tileUnderCursor.CoordsToPoint());
 
                         lastTileUnderCursor = tileUnderCursor;
                     }
                 }
-                else
-                {
-                    CursorAction.LeftUpOnMouseMove(tileUnderCursor == null ? Point2D.NegativeOne : tileUnderCursor.CoordsToPoint());
-                }
+
+                // Re-check for null in case the cursor action exited itself on LeftDown
+                if (CursorAction != null)
+                    CursorAction.MouseMove(tileUnderCursor == null ? Point2D.NegativeOne : tileUnderCursor.CoordsToPoint());
             }
 
             // Right-click scrolling
@@ -660,6 +671,9 @@ namespace TSMapEditor.UI
                     if (CursorAction != null)
                     {
                         CursorAction.Update(tileUnderCursor.CoordsToPoint());
+
+                        if (Cursor.LeftDown && !CursorAction.OnlyUniqueCellEvents)
+                            CursorAction.LeftDown(tileUnderCursor.CoordsToPoint());
                     }
                 }
             }

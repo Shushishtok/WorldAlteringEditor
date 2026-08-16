@@ -3,8 +3,6 @@ using Rampastring.XNAUI;
 using TSMapEditor.GameMath;
 using TSMapEditor.Models;
 using TSMapEditor.UI.Controls;
-using Rampastring.XNAUI.XNAControls;
-using System.Collections.Generic;
 
 namespace TSMapEditor.UI.Windows
 {
@@ -17,14 +15,8 @@ namespace TSMapEditor.UI.Windows
 
         public event EventHandler ObjectSelected;
 
-        protected EditorSuggestionTextBox tbSearch;
+        protected EditorListBoxSearchTextBox tbSearch;
         protected EditorListBox lbObjectList;
-        private readonly List<XNAListBoxItem> originalObjectList = [];
-        /// <summary>
-        /// The minimum score required for a Fuzzy Search item to appear. 
-        /// Higher scores filters more heavily and increases precision,
-        /// while lower scores allow for more results.
-        /// </summary>
         protected int MinimumFuzzySearchScore { get; set; } = 50;
 
         /// <summary>
@@ -53,10 +45,11 @@ namespace TSMapEditor.UI.Windows
                 Parent.UpdateOrder = UpdateOrder;
             }
 
-            tbSearch = FindChild<EditorSuggestionTextBox>(nameof(tbSearch));
+            tbSearch = FindChild<EditorListBoxSearchTextBox>(nameof(tbSearch));
             UIHelpers.AddSearchTipsBoxToControl(tbSearch);
 
             lbObjectList = FindChild<EditorListBox>(nameof(lbObjectList));
+            tbSearch.ListBox = lbObjectList;
 
             lbObjectList.AllowRightClickUnselect = false;
             lbObjectList.DoubleLeftClick += (s, e) => ConfirmSelection();
@@ -65,7 +58,6 @@ namespace TSMapEditor.UI.Windows
 
             FindChild<EditorButton>("btnSelect").LeftClick += (s, e) => ConfirmSelection();
 
-            tbSearch.TextChanged += TbSearch_TextChanged;
             tbSearch.EnterPressed += (s, e) => { ConfirmSelection(); };
 
             // Make pressing X not save changes
@@ -91,35 +83,6 @@ namespace TSMapEditor.UI.Windows
         {
             Keyboard.OnKeyDown -= Keyboard_OnKeyDown;
             base.Kill();
-        }
-
-        private void TbSearch_TextChanged(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(tbSearch.Text) || tbSearch.Text == tbSearch.Suggestion)
-            {                
-                RestoreFromOriginalList();
-            }
-            else
-            {
-                var fuzzySearchItems = Helpers.FuzzySearch(tbSearch.Text, originalObjectList, item => item.Text, MinimumFuzzySearchScore, true);
-
-                lbObjectList.Clear();
-
-                lbObjectList.ViewTop = 0;
-                lbObjectList.SelectedIndex = -1;
-
-                foreach (var fuzzySearchItem in fuzzySearchItems)
-                {   
-                    var listBoxItem = fuzzySearchItem.Item;
-
-                    lbObjectList.AddItem(listBoxItem);
-
-                    if (lbObjectList.SelectedIndex == -1)
-                        lbObjectList.SelectedIndex = 0;
-                }
-            }
-
-            lbObjectList.RefreshScrollbar();
         }
 
         private void SelectObjectWindow_EnabledChanged(object sender, EventArgs e)
@@ -160,7 +123,6 @@ namespace TSMapEditor.UI.Windows
             this.initialSelection = SelectedObject;
             OnOpen();
             ListObjects();
-            SaveToOriginalList();
 
             if (lbObjectList.SelectedItem == null)
             {
@@ -212,26 +174,6 @@ namespace TSMapEditor.UI.Windows
             infoPanel.Open(itemAsHintable.GetHeaderText(),
                 itemAsHintable.GetHintText(),
                 new Point2D(Width, GetCursorPoint().Y));
-        }
-
-        private void SaveToOriginalList()
-        {
-            originalObjectList.Clear();
-
-            foreach (var item in lbObjectList.Items)
-            {
-                originalObjectList.Add(item);
-            }
-        }
-
-        private void RestoreFromOriginalList()
-        {
-            lbObjectList.Clear();
-
-            foreach (var item in originalObjectList)
-            {
-                lbObjectList.AddItem(item);
-            }
         }
 
         protected abstract void ListObjects();

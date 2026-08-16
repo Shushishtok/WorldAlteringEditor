@@ -1,5 +1,6 @@
 ﻿using TSMapEditor.GameMath;
 using TSMapEditor.UI;
+using TSMapEditor.Models;
 
 namespace TSMapEditor.Mutations.Classes
 {
@@ -12,7 +13,8 @@ namespace TSMapEditor.Mutations.Classes
         public PlacedTile CurrentTile;
         public PlacedTile PreviousTile;
 
-        public OriginalCellTerrainData(Point2D cellCoords, int tileIndex, byte subTileIndex, byte heightLevel, PlacedTile currentTile, PlacedTile previousTile)
+        public OriginalCellTerrainData(Point2D cellCoords, int tileIndex, byte subTileIndex, byte heightLevel,
+            PlacedTile currentTile = null, PlacedTile previousTile = null)
         {
             CellCoords = cellCoords;
             TileIndex = tileIndex;

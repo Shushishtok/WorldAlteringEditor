@@ -229,7 +229,7 @@ namespace TSMapEditor.UI.TopBar
                 btn.Width = btnClearTerrain.Width;
                 btn.Height = btnClearTerrain.Height;
                 var tileGraphics = theaterGraphics.GetTileGraphics(autoLATGround.GroundTileSet.StartTileIndex);
-                btn.ExtraTexture = tileGraphics != null && tileGraphics.TMPImages.Length > 0 ? tileGraphics.TMPImages[0].TextureFromTmpImage_RGBA(GraphicsDevice) : null;
+                btn.ExtraTexture = tileGraphics != null && tileGraphics.SubTileCount > 0 ? tileGraphics.TMPImages[0].TextureFromTmpImage_RGBA(GraphicsDevice) : null;
                 btn.Tag = autoLATGround;
                 btn.LeftClick += (s, e) => EnterLATPlacementMode(autoLATGround.GroundTileSet.StartTileIndex);
                 latPanel.AddChild(btn);
@@ -249,12 +249,12 @@ namespace TSMapEditor.UI.TopBar
                     if (lg.BaseTileSet == null)
                         return Translate(this, "Clear", "Clear");
 
-                    return lg.BaseTileSet.SetName;
+                    return lg.BaseTileSet.TranslatedName;
                 }).ToArray();
 
                 toolTip.Text = string.Format(Translate(this, "PlacedOnTopOf",
                     "{0} (placed on top of {1})"),
-                        autoLATGround.GroundTileSet.SetName, string.Join(Translate(this, "Or", " or "), allBases));
+                        autoLATGround.GroundTileSet.TranslatedName, string.Join(Translate(this, "Or", " or "), allBases));
 
                 toolTip.ToolTipDelay = 0;
 
