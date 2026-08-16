@@ -1,6 +1,9 @@
-﻿using Microsoft.Xna.Framework;
+﻿using MapEditorLibrary;
+using MapEditorLibrary.Misc;
+using MapEditorLibrary.Models;
+using MapEditorLibrary.Models.Enums;
+using Microsoft.Xna.Framework;
 using System;
-using TSMapEditor.Misc;
 
 namespace TSMapEditor.Models
 {

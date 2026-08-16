@@ -3,14 +3,8 @@
 // Using clauses.
 // Unless you know what's in the WAE code-base, you want to always include
 // these "standard usings".
-using System;
-using TSMapEditor;
-using TSMapEditor.Models;
-using TSMapEditor.CCEngine;
-using TSMapEditor.Rendering;
-using TSMapEditor.GameMath;
-using TSMapEditor.UI.Windows;
-using Rampastring.XNAUI;
+using MapEditorLibrary.Models;
+using MapEditorLibrary.Models.Enums;
 
 namespace WAEScript
 {

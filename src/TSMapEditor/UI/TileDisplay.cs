@@ -10,6 +10,7 @@ using Rampastring.XNAUI.XNAControls;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using TSMapEditor.Models;
 using TSMapEditor.Rendering;
 using TSMapEditor.UI.CursorActions;
 

@@ -8,6 +8,7 @@ using MapEditorLibrary.Mutations.Classes;
 using Rampastring.XNAUI.Input;
 using System;
 using System.Collections.Generic;
+using TSMapEditor.Models;
 
 namespace TSMapEditor.UI.CursorActions;
 
@@ -40,38 +41,8 @@ public class PlaceTerrainCursorAction : LineAndRegularPaintingAction
 	/// </summary>
 	private bool placedDownNonFlatTile = false;
 
-	public override void OnActionEnter();
-    
-
-    public override string GetName() => Translate("Name", "Place Terrain Tiles");
-
-    public override bool HandlesKeyboardInput => true;
-
-    private MGTileImage _tile;
-    public MGTileImage Tile
+    public PlaceTerrainCursorAction(ICursorActionTarget cursorActionTarget) : base(cursorActionTarget)
     {
-        get => _tile;
-        set
-        {
-            _tile = value;
-            heightOffset = 0;
-        }
-    }
-
-    private int heightOffset;
-
-    private HashSet<MapTile> previewTiles = new HashSet<MapTile>();
-
-    /// <summary>
-    /// Used to temporarily block input after the user has placed down a tile that modified terrain height.
-    /// Input is handled again once the mouse has been moved.
-    /// </summary>
-    private bool placedDownNonFlatTile = false;
-
-    public override void OnActionEnter()
-    {
-        heightOffset = 0;
-        base.OnActionEnter();
     }
 
     public override void OnActionExit()

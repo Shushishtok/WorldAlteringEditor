@@ -1,10 +1,11 @@
-﻿using Rampastring.XNAUI;
+﻿using MapEditorLibrary.Models;
+using MapEditorLibrary.Misc;
+using Rampastring.XNAUI;
 using Rampastring.XNAUI.XNAControls;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using TSMapEditor.Misc;
 using TSMapEditor.Models;
 using TSMapEditor.UI.Controls;
 

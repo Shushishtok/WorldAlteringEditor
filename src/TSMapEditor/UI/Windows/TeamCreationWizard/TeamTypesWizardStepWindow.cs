@@ -1,4 +1,6 @@
-﻿using Rampastring.XNAUI;
+﻿using MapEditorLibrary;
+using MapEditorLibrary.Models;
+using Rampastring.XNAUI;
 using Rampastring.XNAUI.XNAControls;
 using System;
 using System.Collections.Generic;

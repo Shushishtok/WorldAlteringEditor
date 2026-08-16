@@ -100,10 +100,7 @@
 	</None>
 	<None Update="Config\Default\UI\Windows\AITriggersWizardStepWindow.ini">
 	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	</None>
-	<None Update="Config\Default\UI\Windows\TweakDifficultyWindow.ini">
-	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	</None>	  
+	</None>	
     <None Update="Config\Default\UI\Windows\SettingsPanel.ini">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

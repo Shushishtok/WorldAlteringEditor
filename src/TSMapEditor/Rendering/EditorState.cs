@@ -31,48 +31,7 @@ public class EditorState
 
     private CursorAction _cursorAction;
     public CursorAction CursorAction;    
-	public event EventHandler CursorActionChanged;
-	public event EventHandler ObjectOwnerChanged;
-	public event EventHandler AutoLATEnabledChanged;
-	public event EventHandler OnlyPaintOnClearGroundChanged;
-	public event EventHandler MapWideOverlayExistsChanged;
-	public event EventHandler DrawMapWideOverlayChanged;
-	public event EventHandler HighlightImpassableCellsChanged;
-	public event EventHandler HighlightIceGrowthChanged;
-	public event EventHandler BrushSizeChanged;
-	public event EventHandler MarbleMadnessChanged;
-	public event EventHandler Is2DModeChanged;
-	public event EventHandler RenderedObjectsChanged;
-	public event EventHandler LightingPreviewStateChanged;
-	public event EventHandler IsLightingChanged;
-	public event EventHandler FilterTilesDisplayChanged;
-
-	private CursorAction _cursorAction;
-	public CursorAction CursorAction
-	{
-		get => _cursorAction;
-		set	
-		{
-			if (_cursorAction != value)
-			{
-				if (_cursorAction != null)
-				{
-					_cursorAction.OnExit();
-					_cursorAction.OnExitingAction -= CursorAction_OnExitingAction;
-				}
-
-				_cursorAction = value;
-				if (_cursorAction != null)
-				{
-					_cursorAction.OnExitingAction += CursorAction_OnExitingAction;
-					_cursorAction.OnActionEnter();
-				}
-					
-				CursorActionChanged?.Invoke(this, EventArgs.Empty);
-			}
-		}
-	}    
-	
+	public event EventHandler FilterTilesDisplayChanged;	
 
     private void CursorAction_OnExitingAction(object sender, EventArgs e)
     {

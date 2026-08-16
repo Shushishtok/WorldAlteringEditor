@@ -1,5 +1,5 @@
-using TSMapEditor.CCEngine.TileData;
-using TSMapEditor.GameMath;
+using MapEditorLibrary.CCEngine.TileData;
+using MapEditorLibrary.GameMath;
 
 namespace TSMapEditor.Models
 {
